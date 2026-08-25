@@ -1,8 +1,7 @@
-# Apibara Observability
+# Starkstream DNA observability
 
-This crate contains helpers to setup observability with `tracing` and
-`opentelemetry`.
+This private crate contains the shared tracing, metrics, and OpenTelemetry setup
+used by Starkstream DNA binaries.
 
-## Usage
-
-Invoke the `init_opentelemetry` function at the beginning of your program.
+Call `init_opentelemetry` during process startup and use the provided request and
+metric helpers to keep telemetry behavior consistent across the server tools.

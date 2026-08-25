@@ -1,6 +1,6 @@
 # Starkstream DNA release contract
 
-This repo publishes an immutable `apibara-dna-starknet` runtime image for the
+This repo publishes an immutable `starkstream-dna-starknet` runtime image for the
 Starkstream infrastructure. On `main`, `.github/workflows/release.yml` owns the
 image build and publishes the immutable
 `<region>-docker.pkg.dev/<project>/dna-starknet/dna-starknet` image. It does not
