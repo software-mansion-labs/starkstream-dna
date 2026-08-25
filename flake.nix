@@ -27,20 +27,6 @@
         };
 
         crates = {
-          dna-beaconchain = {
-            description = "The Beacon Chain DNA server";
-            path = ./beaconchain;
-            ports = {
-              "7007/tcp" = { };
-            };
-          };
-          dna-evm = {
-            description = "The EVM DNA server";
-            path = ./evm;
-            ports = {
-              "7007/tcp" = { };
-            };
-          };
           dna-starknet = {
             description = "The Starknet DNA server";
             path = ./starknet;
@@ -62,6 +48,7 @@
         };
 
         ci = pkgs.callPackage ./nix/ci.nix { };
+
       in
       {
         # format with `nix fmt`

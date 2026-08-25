@@ -5,7 +5,7 @@ use std::{
 
 use apibara_dna_protocol::{
     dna::stream::{dna_stream_client::DnaStreamClient, Cursor, StreamDataRequest},
-    evm, starknet,
+    starknet,
 };
 use byte_unit::Byte;
 use clap::{Args, Parser, Subcommand};
@@ -29,8 +29,6 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
-    /// Benchmark the EVM DNA stream.
-    Evm(CommonArgs),
     /// Benchmark the Starknet DNA stream.
     Starknet(CommonArgs),
 }
@@ -59,7 +57,6 @@ pub struct CommonArgs {
 impl Cli {
     pub async fn run(self, ct: CancellationToken) -> Result<(), BenchmarkError> {
         match self.command {
-            Command::Evm(args) => run_benchmark::<evm::Filter, EvmStats>(args, ct).await,
             Command::Starknet(args) => {
                 run_benchmark::<starknet::Filter, StarknetStats>(args, ct).await
             }
@@ -199,90 +196,6 @@ trait Stats {
     fn new(index: usize) -> Self;
     fn record(&mut self, item: Self::Block);
     fn print_summary(&self);
-}
-
-struct EvmStats {
-    pub index: usize,
-    pub block_number: u64,
-    pub start: Instant,
-    pub bytes: u64,
-    pub blocks: u64,
-    pub transactions: u64,
-    pub receipts: u64,
-    pub logs: u64,
-    pub withdrawals: u64,
-}
-
-impl Stats for EvmStats {
-    type Block = evm::Block;
-
-    fn new(index: usize) -> Self {
-        Self {
-            index,
-            start: Instant::now(),
-            block_number: 0,
-            blocks: 0,
-            bytes: 0,
-            transactions: 0,
-            receipts: 0,
-            logs: 0,
-            withdrawals: 0,
-        }
-    }
-
-    fn record(&mut self, block: evm::Block) {
-        self.block_number = block
-            .header
-            .as_ref()
-            .map(|h| h.block_number)
-            .unwrap_or_default();
-        self.blocks += 1;
-        self.bytes += block.encoded_len() as u64;
-
-        self.transactions += block.transactions.len() as u64;
-        self.receipts += block.receipts.len() as u64;
-        self.logs += block.logs.len() as u64;
-        self.withdrawals += block.withdrawals.len() as u64;
-    }
-
-    fn print_summary(&self) {
-        let elapsed = self.start.elapsed();
-
-        let elapsed_sec = elapsed.as_secs_f64();
-        let bytes = Byte::from_u64(self.bytes);
-
-        info!(
-            latest_block = %self.block_number,
-            blocks = %self.blocks,
-            bytes = format!("{:#.6}", bytes),
-            transactions = %self.transactions,
-            receipts = %self.receipts,
-            logs = %self.logs,
-            withdrawals = %self.withdrawals,
-            elapsed = ?elapsed,
-            "[{}] evm stats (count)",
-            self.index,
-        );
-
-        let block_rate = self.blocks as f64 / elapsed_sec;
-        let byte_rate = Byte::from_f64(self.bytes as f64 / elapsed_sec).unwrap_or_default();
-        let transaction_rate = self.transactions as f64 / elapsed_sec;
-        let receipt_rate = self.receipts as f64 / elapsed_sec;
-        let log_rate = self.logs as f64 / elapsed_sec;
-        let withdrawal_rate = self.withdrawals as f64 / elapsed_sec;
-
-        info!(
-            blocks = %block_rate,
-            bytes = format!("{:#.6}/s", byte_rate),
-            transactions = %transaction_rate,
-            receipts = %receipt_rate,
-            logs = %log_rate,
-            withdrawals = %withdrawal_rate,
-            elapsed = ?elapsed,
-            "[{}] evm stats (rate)",
-            self.index,
-        );
-    }
 }
 
 struct StarknetStats {
