@@ -1,13 +1,13 @@
 use std::collections::{BTreeMap, HashMap};
 
-use apibara_dna_protocol::dna::stream::{
-    stream_data_response::Message, Data, DataFinality, DataProduction, Finalize, Invalidate,
-    StreamDataResponse,
-};
-use apibara_observability::{KeyValue, RecordRequest};
 use bytes::{BufMut, Bytes, BytesMut};
 use error_stack::{Result, ResultExt};
 use futures::FutureExt;
+use starkstream_dna_observability::{KeyValue, RecordRequest};
+use starkstream_dna_protocol::dna::stream::{
+    stream_data_response::Message, Data, DataFinality, DataProduction, Finalize, Invalidate,
+    StreamDataResponse,
+};
 use tokio::sync::mpsc;
 use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 use tokio_util::sync::CancellationToken;
@@ -221,7 +221,7 @@ impl DataStream {
                         .inspect_err(|e| error!("tick: segment stream error: {}", e))?;
                 }
                 segment_result = segment_rx.next() => {
-                    use apibara_dna_protocol::dna::stream::Cursor as ProtoCursor;
+                    use starkstream_dna_protocol::dna::stream::Cursor as ProtoCursor;
 
                     let Some(segment_fetch) = segment_result else {
                         debug!("tick: segment stream consumer finished");
@@ -286,7 +286,7 @@ impl DataStream {
         tx: &mpsc::Sender<DataStreamMessage>,
         ct: &CancellationToken,
     ) -> Result<(), DataStreamError> {
-        use apibara_dna_protocol::dna::stream::Cursor as ProtoCursor;
+        use starkstream_dna_protocol::dna::stream::Cursor as ProtoCursor;
 
         debug!(cursor = %cursor, is_head, "tick: single block");
 
@@ -421,7 +421,7 @@ impl DataStream {
         tx: &mpsc::Sender<DataStreamMessage>,
         ct: &CancellationToken,
     ) -> Result<(), DataStreamError> {
-        use apibara_dna_protocol::dna::stream::Cursor as ProtoCursor;
+        use starkstream_dna_protocol::dna::stream::Cursor as ProtoCursor;
 
         debug!("tick: pending block");
 

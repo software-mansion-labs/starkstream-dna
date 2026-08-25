@@ -1,8 +1,10 @@
 [workspace.package]
 edition = "2021"
 authors = ["Francesco Ceccon", "The Apibara contributors"]
-repository = "https://github.com/apibara/dna"
+repository = "https://github.com/software-mansion-labs/starkstream-dna"
+homepage = "https://starkstream.io"
 license = "Apache-2.0"
+publish = false
 
 [workspace]
 resolver = "2"

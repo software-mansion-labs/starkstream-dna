@@ -1,14 +1,16 @@
 [package]
-name = "apibara-etcd-dbg"
+name = "starkstream-dna-etcd-dbg"
 version = "0.1.0"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+homepage.workspace = true
+publish.workspace = true
 
 [dependencies]
-apibara-etcd = { path = "../etcd" }
-apibara-observability = { path = "../observability" }
+starkstream-dna-etcd = { path = "../etcd" }
+starkstream-dna-observability = { path = "../observability" }
 clap.workspace = true
 error-stack.workspace = true
 tokio.workspace = true

@@ -1,4 +1,4 @@
-use apibara_observability::Counter;
+use starkstream_dna_observability::Counter;
 
 #[derive(Debug, Clone)]
 pub struct ObjectStoreMetrics {
@@ -10,7 +10,7 @@ pub struct ObjectStoreMetrics {
 
 impl Default for ObjectStoreMetrics {
     fn default() -> Self {
-        let meter = apibara_observability::meter("object_store");
+        let meter = starkstream_dna_observability::meter("object_store");
 
         Self {
             get: meter

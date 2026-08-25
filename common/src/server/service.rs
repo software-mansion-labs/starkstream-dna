@@ -1,11 +1,11 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-use apibara_dna_protocol::dna::stream::{
+use error_stack::Result;
+use futures::{Future, TryFutureExt};
+use starkstream_dna_protocol::dna::stream::{
     dna_stream_server::{self, DnaStream},
     DataFinality, StatusRequest, StatusResponse, StreamDataRequest,
 };
-use error_stack::Result;
-use futures::{Future, TryFutureExt};
 use tokio::sync::{mpsc, Semaphore};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};

@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use apibara_dna_common::{
+use error_stack::{Report, Result, ResultExt};
+use starkstream_dna_common::{
     chain::{BlockInfo, PendingBlockInfo},
     fragment::{
         Block, BodyFragment, HeaderFragment, Index, IndexFragment, IndexGroupFragment, Join,
@@ -11,8 +12,7 @@ use apibara_dna_common::{
     join::{JoinToManyIndexBuilder, JoinToOneIndexBuilder},
     Cursor, Hash,
 };
-use apibara_dna_protocol::starknet;
-use error_stack::{Report, Result, ResultExt};
+use starkstream_dna_protocol::starknet;
 // use futures::StreamExt;
 use prost::Message;
 use tokio_stream::StreamExt as TokioStreamExt;

@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use apibara_etcd::{AuthOptions, EtcdClient, EtcdClientError, EtcdClientOptions};
 use aws_config::{meta::region::RegionProviderChain, Region};
 use azure_storage::{CloudLocation, StorageCredentials};
 use clap::Args;
 use error_stack::{Result, ResultExt};
+use starkstream_dna_etcd::{AuthOptions, EtcdClient, EtcdClientError, EtcdClientOptions};
 
 use crate::{
     compaction::CompactionArgs,

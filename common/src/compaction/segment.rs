@@ -1,7 +1,7 @@
-use apibara_observability::RecordRequest;
 use error_stack::{Result, ResultExt};
 use futures::{FutureExt, StreamExt};
 use futures_buffered::FuturesOrderedBounded;
+use starkstream_dna_observability::RecordRequest;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
@@ -276,7 +276,7 @@ impl SegmentService {
         );
 
         for segment in segment_data {
-            use apibara_observability::KeyValue;
+            use starkstream_dna_observability::KeyValue;
 
             let segment_name = segment.name.clone();
 

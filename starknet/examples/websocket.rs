@@ -2,10 +2,10 @@
 
 use std::{pin::Pin, time::Duration};
 
-use apibara_dna_common::Cursor;
-use apibara_dna_starknet::{provider::StarknetProviderError, NewHeadsStream};
 use error_stack::{Result, ResultExt};
 use futures::Stream;
+use starkstream_dna_common::Cursor;
+use starkstream_dna_starknet::{provider::StarknetProviderError, NewHeadsStream};
 use tokio_stream::StreamExt;
 
 async fn connect_to_stream(

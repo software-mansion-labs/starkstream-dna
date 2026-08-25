@@ -1,4 +1,3 @@
-use apibara_dna_common::{Cursor, Hash};
 pub use starknet_rust::core::types::{
     BlockWithReceipts, CallType, ContractStorageDiffItem, DataAvailabilityMode,
     DeclareTransactionContent, DeclareTransactionReceipt, DeclareTransactionTrace,
@@ -18,6 +17,7 @@ pub use starknet_rust::core::types::{
     TraceBlockTransactionsResult, TransactionContent, TransactionReceipt, TransactionTrace,
     TransactionTraceWithHash, TransactionWithReceipt,
 };
+use starkstream_dna_common::{Cursor, Hash};
 
 pub trait BlockExt {
     fn is_finalized(&self) -> bool;

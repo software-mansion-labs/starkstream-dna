@@ -1,8 +1,8 @@
-use apibara_dna_common::{
+use starkstream_dna_common::{
     index::ScalarValue,
     query::{Condition, Filter},
 };
-use apibara_dna_protocol::starknet;
+use starkstream_dna_protocol::starknet;
 
 use crate::fragment::{CONTRACT_CHANGE_FRAGMENT_ID, INDEX_CONTRACT_CHANGE_BY_TYPE};
 

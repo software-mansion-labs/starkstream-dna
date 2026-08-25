@@ -19,10 +19,10 @@ pub mod rkyv;
 pub mod segment;
 pub mod server;
 
-pub use apibara_etcd as etcd;
 use data_stream::BlockFilterFactory;
 use fragment::FragmentInfo;
 use ingestion::BlockIngestion;
+pub use starkstream_dna_etcd as etcd;
 
 pub use self::core::{testing::new_test_cursor, Cursor, GetCursor, Hash};
 
@@ -249,9 +249,9 @@ mod server_impl {
     }
 
     fn emit_dna_up_metric(version: &'static str) {
-        use apibara_observability::KeyValue;
+        use starkstream_dna_observability::KeyValue;
 
-        let meter = apibara_observability::meter("dna");
+        let meter = starkstream_dna_observability::meter("dna");
 
         let up = meter
             .u64_gauge("dna.up")

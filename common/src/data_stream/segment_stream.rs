@@ -1,10 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
-use apibara_observability::{KeyValue, RecordRequest};
 use error_stack::{Result, ResultExt};
 use futures::TryStreamExt;
 use futures_buffered::FuturesOrderedBounded;
 use roaring::RoaringBitmap;
+use starkstream_dna_observability::{KeyValue, RecordRequest};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;

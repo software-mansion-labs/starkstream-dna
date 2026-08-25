@@ -8,9 +8,9 @@ mod segment;
 mod segment_builder;
 mod service;
 
-use apibara_etcd::{EtcdClient, LockOptions};
 use error_stack::{Result, ResultExt};
 use metrics::CompactionMetrics;
+use starkstream_dna_etcd::{EtcdClient, LockOptions};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
@@ -27,7 +27,7 @@ pub async fn compaction_service_loop(
     options: CompactionServiceOptions,
     ct: CancellationToken,
 ) -> Result<(), CompactionError> {
-    use apibara_observability::KeyValue;
+    use starkstream_dna_observability::KeyValue;
 
     let mut lock_client = etcd_client.lock_client(LockOptions::default());
 

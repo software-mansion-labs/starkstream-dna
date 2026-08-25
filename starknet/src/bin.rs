@@ -1,8 +1,8 @@
-use apibara_dna_starknet::{cli::Cli, error::StarknetError};
-use apibara_observability::init_opentelemetry;
 use clap::Parser;
 use error_stack::{Result, ResultExt};
 use mimalloc::MiMalloc;
+use starkstream_dna_observability::init_opentelemetry;
+use starkstream_dna_starknet::{cli::Cli, error::StarknetError};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 

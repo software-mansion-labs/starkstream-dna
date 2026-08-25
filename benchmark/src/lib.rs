@@ -3,15 +3,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-use apibara_dna_protocol::{
-    dna::stream::{dna_stream_client::DnaStreamClient, Cursor, StreamDataRequest},
-    starknet,
-};
 use byte_unit::Byte;
 use clap::{Args, Parser, Subcommand};
 use error_stack::{Result, ResultExt};
 use futures::{StreamExt, TryStreamExt};
 use prost::Message;
+use starkstream_dna_protocol::{
+    dna::stream::{dna_stream_client::DnaStreamClient, Cursor, StreamDataRequest},
+    starknet,
+};
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tonic::{metadata::AsciiMetadataValue, IntoRequest};
@@ -145,7 +145,7 @@ where
     let print_interval = Duration::from_secs(10);
 
     while let Some(message) = stream.try_next().await.change_context(BenchmarkError)? {
-        use apibara_dna_protocol::dna::stream::stream_data_response::Message as ProtoMessage;
+        use starkstream_dna_protocol::dna::stream::stream_data_response::Message as ProtoMessage;
         match message.message {
             Some(ProtoMessage::Data(data_message)) => {
                 let block_number = data_message
@@ -174,7 +174,7 @@ where
                 }
             }
             Some(ProtoMessage::SystemMessage(system_message)) => {
-                use apibara_dna_protocol::dna::stream::system_message::Output;
+                use starkstream_dna_protocol::dna::stream::system_message::Output;
 
                 match system_message.output {
                     Some(Output::Stdout(stdout)) => info!("{}", stdout),

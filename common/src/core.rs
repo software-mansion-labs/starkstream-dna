@@ -1,5 +1,5 @@
-use apibara_dna_protocol::dna;
 use rkyv::{Archive, Deserialize, Serialize};
+use starkstream_dna_protocol::dna;
 
 /// Arbitrary length hash.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Archive, Serialize, Deserialize, Default)]

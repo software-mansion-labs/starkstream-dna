@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use apibara_etcd::EtcdClient;
 use error_stack::{Result, ResultExt};
 use futures::TryStreamExt;
+use starkstream_dna_etcd::EtcdClient;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 

@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use apibara_etcd::{EtcdClient, EtcdClientOptions, LockOptions};
-use apibara_observability::init_opentelemetry;
 use clap::{Parser, Subcommand};
 use error_stack::{Result, ResultExt};
+use starkstream_dna_etcd::{EtcdClient, EtcdClientOptions, LockOptions};
+use starkstream_dna_observability::init_opentelemetry;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 

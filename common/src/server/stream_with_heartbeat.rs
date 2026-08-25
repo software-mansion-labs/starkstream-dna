@@ -4,8 +4,8 @@ use std::{
     time::Duration,
 };
 
-use apibara_dna_protocol::dna::stream::{stream_data_response, StreamDataResponse};
 use futures::Stream;
+use starkstream_dna_protocol::dna::stream::{stream_data_response, StreamDataResponse};
 use tokio::{sync::mpsc, time::Interval};
 
 pub struct ResponseStreamWithHeartbeat {

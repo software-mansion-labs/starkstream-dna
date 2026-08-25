@@ -1,6 +1,6 @@
-use apibara_observability::RecordRequest;
 use error_stack::{Result, ResultExt};
 use futures_buffered::FuturesOrderedBounded;
+use starkstream_dna_observability::RecordRequest;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
