@@ -44,7 +44,73 @@ pub struct DataStream {
 
 type DataStreamMessage = tonic::Result<StreamDataResponse, tonic::Status>;
 
-const DEFAULT_BLOCKS_BUFFER_SIZE: usize = 1024 * 1024;
+const FILTER_IDS_TAG: u32 = 1;
+
+fn encoded_length_delimited_field_len(
+    tag: u32,
+    payload_len: usize,
+) -> Result<usize, DataStreamError> {
+    let payload_len_u64 = u64::try_from(payload_len)
+        .change_context(DataStreamError)
+        .attach_printable("length-delimited protobuf payload does not fit in u64")?;
+
+    prost::encoding::key_len(tag)
+        .checked_add(prost::encoding::encoded_len_varint(payload_len_u64))
+        .and_then(|len| len.checked_add(payload_len))
+        .ok_or(DataStreamError)
+        .attach_printable("length-delimited protobuf field size overflow")
+}
+
+fn encoded_header_len(fragment_id: u32, data_len: usize) -> Result<usize, DataStreamError> {
+    encoded_length_delimited_field_len(fragment_id, data_len)
+}
+
+fn encoded_body_item_len_from_parts(
+    fragment_id: u32,
+    filter_ids_len: usize,
+    message_len: usize,
+) -> Result<usize, DataStreamError> {
+    let payload_len = filter_ids_len
+        .checked_add(message_len)
+        .ok_or(DataStreamError)
+        .attach_printable("filtered body item payload size overflow")?;
+    encoded_length_delimited_field_len(fragment_id, payload_len)
+}
+
+fn encoded_body_item_len(
+    fragment_id: u32,
+    filter_ids: &[u32],
+    message_len: usize,
+) -> Result<usize, DataStreamError> {
+    encoded_body_item_len_from_parts(
+        fragment_id,
+        prost::encoding::uint32::encoded_len_packed(FILTER_IDS_TAG, filter_ids),
+        message_len,
+    )
+}
+
+fn encode_header(fragment_id: u32, data: &[u8], output: &mut BytesMut) {
+    prost::encoding::encode_key(
+        fragment_id,
+        prost::encoding::WireType::LengthDelimited,
+        output,
+    );
+    prost::encoding::encode_varint(data.len() as u64, output);
+    output.put_slice(data);
+}
+
+fn encode_body_item(fragment_id: u32, filter_ids: &[u32], message: &[u8], output: &mut BytesMut) {
+    let filter_ids_len = prost::encoding::uint32::encoded_len_packed(FILTER_IDS_TAG, filter_ids);
+
+    prost::encoding::encode_key(
+        fragment_id,
+        prost::encoding::WireType::LengthDelimited,
+        output,
+    );
+    prost::encoding::encode_varint((filter_ids_len + message.len()) as u64, output);
+    prost::encoding::uint32::encode_packed(FILTER_IDS_TAG, filter_ids, output);
+    output.put_slice(message);
+}
 
 impl DataStream {
     #[allow(clippy::too_many_arguments)]
@@ -505,7 +571,6 @@ impl DataStream {
         for block_filter in self.block_filter.iter() {
             let mut local_fragments_size_bytes = HashMap::<String, usize>::new();
 
-            let mut data_buffer = BytesMut::with_capacity(DEFAULT_BLOCKS_BUFFER_SIZE);
             let mut fragment_matches = BTreeMap::default();
 
             let mut joins = BTreeMap::<(FragmentId, FragmentId), FilterMatch>::default();
@@ -596,21 +661,18 @@ impl DataStream {
                 HeaderFilter::OnDataOrOnNewBlock => !fragment_matches.is_empty() || is_live,
             };
 
-            if should_send_header {
-                let header = fragment_access
-                    .get_header_fragment()
-                    .change_context(DataStreamError)
-                    .attach_printable("failed to get header fragment")?;
+            let header = if should_send_header {
+                Some(
+                    fragment_access
+                        .get_header_fragment()
+                        .change_context(DataStreamError)
+                        .attach_printable("failed to get header fragment")?,
+                )
+            } else {
+                None
+            };
 
-                prost::encoding::encode_key(
-                    HEADER_FRAGMENT_ID as u32,
-                    prost::encoding::WireType::LengthDelimited,
-                    &mut data_buffer,
-                );
-                prost::encoding::encode_varint(header.data.len() as u64, &mut data_buffer);
-                data_buffer.put(header.data.as_slice());
-            }
-
+            let mut matched_fragments = Vec::with_capacity(fragment_matches.len());
             for (fragment_id, filter_match) in fragment_matches.into_iter() {
                 let Some(fragment_name) = self.fragment_id_to_name.get(&fragment_id).cloned()
                 else {
@@ -624,38 +686,54 @@ impl DataStream {
                     .change_context(DataStreamError)
                     .attach_printable("failed to get body fragment")?;
 
+                matched_fragments.push((fragment_id, fragment_name, body, filter_match));
+            }
+
+            let mut encoded_size = 0usize;
+            if let Some(header) = header {
+                encoded_size = encoded_header_len(HEADER_FRAGMENT_ID as u32, header.data.len())?;
+            }
+
+            for (fragment_id, _, body, filter_match) in &matched_fragments {
+                for match_ in filter_match.iter() {
+                    let message_bytes = &body.data[match_.index as usize];
+                    encoded_size = encoded_size
+                        .checked_add(encoded_body_item_len(
+                            *fragment_id as u32,
+                            &match_.filter_ids,
+                            message_bytes.len(),
+                        )?)
+                        .ok_or(DataStreamError)
+                        .attach_printable("filtered block encoded size overflow")?;
+                }
+            }
+
+            let mut data_buffer = BytesMut::with_capacity(encoded_size);
+            if let Some(header) = header {
+                encode_header(
+                    HEADER_FRAGMENT_ID as u32,
+                    header.data.as_slice(),
+                    &mut data_buffer,
+                );
+            }
+
+            for (fragment_id, fragment_name, body, filter_match) in matched_fragments {
                 let starting_size = data_buffer.len();
                 for match_ in filter_match.iter() {
-                    const FILTER_IDS_TAG: u32 = 1;
-
                     let message_bytes = &body.data[match_.index as usize];
-                    let filter_ids_len = prost::encoding::uint32::encoded_len_packed(
-                        FILTER_IDS_TAG,
-                        &match_.filter_ids,
-                    );
-
-                    prost::encoding::encode_key(
+                    encode_body_item(
                         fragment_id as u32,
-                        prost::encoding::WireType::LengthDelimited,
-                        &mut data_buffer,
-                    );
-
-                    prost::encoding::encode_varint(
-                        (filter_ids_len + message_bytes.len()) as u64,
-                        &mut data_buffer,
-                    );
-
-                    prost::encoding::uint32::encode_packed(
-                        FILTER_IDS_TAG,
                         &match_.filter_ids,
+                        message_bytes.as_slice(),
                         &mut data_buffer,
                     );
-                    data_buffer.put(message_bytes.as_slice());
                 }
 
                 let fragment_size = data_buffer.len() - starting_size;
                 *local_fragments_size_bytes.entry(fragment_name).or_default() += fragment_size;
             }
+
+            debug_assert_eq!(data_buffer.len(), encoded_size);
 
             if !data_buffer.is_empty() {
                 has_data = true;
@@ -697,5 +775,109 @@ impl std::fmt::Display for DataStreamError {
 impl Drop for DataStream {
     fn drop(&mut self) {
         self.metrics.active.add(-1, &[]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FILTER_IDS_TAG: u32 = 1;
+
+    fn encode_header_existing(fragment_id: u32, data: &[u8]) -> Bytes {
+        let mut output = BytesMut::new();
+        prost::encoding::encode_key(
+            fragment_id,
+            prost::encoding::WireType::LengthDelimited,
+            &mut output,
+        );
+        prost::encoding::encode_varint(data.len() as u64, &mut output);
+        output.put_slice(data);
+        output.freeze()
+    }
+
+    fn encode_body_item_existing(fragment_id: u32, filter_ids: &[u32], message: &[u8]) -> Bytes {
+        let mut output = BytesMut::new();
+        let filter_ids_len =
+            prost::encoding::uint32::encoded_len_packed(FILTER_IDS_TAG, filter_ids);
+
+        prost::encoding::encode_key(
+            fragment_id,
+            prost::encoding::WireType::LengthDelimited,
+            &mut output,
+        );
+        prost::encoding::encode_varint((filter_ids_len + message.len()) as u64, &mut output);
+        prost::encoding::uint32::encode_packed(FILTER_IDS_TAG, filter_ids, &mut output);
+        output.put_slice(message);
+        output.freeze()
+    }
+
+    #[test]
+    fn header_encoded_len_matches_existing_safe_encoding() {
+        for (fragment_id, data) in [
+            (HEADER_FRAGMENT_ID as u32, Vec::new()),
+            (HEADER_FRAGMENT_ID as u32, vec![0x08, 0x96, 0x01]),
+            (255, vec![0xab; 300]),
+        ] {
+            let existing = encode_header_existing(fragment_id, &data);
+            assert_eq!(
+                encoded_header_len(fragment_id, data.len()).unwrap(),
+                existing.len()
+            );
+
+            let mut actual = BytesMut::new();
+            encode_header(fragment_id, &data, &mut actual);
+            assert_eq!(actual.freeze(), existing);
+        }
+    }
+
+    #[test]
+    fn body_item_encoded_len_matches_existing_safe_encoding() {
+        let cases = [
+            (2, vec![], vec![]),
+            (2, vec![1], vec![0x12, 0x00]),
+            (2, vec![1, 127, 128, 16_384], vec![0x42; 73]),
+            (255, vec![300], vec![0x5a; 1024 * 1024 + 1]),
+        ];
+
+        for (fragment_id, filter_ids, message) in cases {
+            let existing = encode_body_item_existing(fragment_id, &filter_ids, &message);
+            assert_eq!(
+                encoded_body_item_len(fragment_id, &filter_ids, message.len()).unwrap(),
+                existing.len()
+            );
+
+            let mut actual = BytesMut::new();
+            encode_body_item(fragment_id, &filter_ids, &message, &mut actual);
+            assert_eq!(actual.freeze(), existing);
+        }
+    }
+
+    #[test]
+    fn checked_encoded_len_rejects_overflow_without_large_allocation() {
+        assert!(encoded_length_delimited_field_len(1, usize::MAX).is_err());
+        assert!(encoded_body_item_len_from_parts(2, usize::MAX, 1).is_err());
+    }
+
+    #[test]
+    fn representative_items_preserve_exact_bytes_and_order() {
+        let header = [0x08, 0x2a];
+        let body_a = [0x12, 0x01, 0xaa];
+        let body_b = [0x1a, 0x02, 0xbb, 0xcc];
+        let mut expected = BytesMut::new();
+        expected.extend_from_slice(&encode_header_existing(1, &header));
+        expected.extend_from_slice(&encode_body_item_existing(2, &[1, 128], &body_a));
+        expected.extend_from_slice(&encode_body_item_existing(255, &[3], &body_b));
+
+        let predicted = encoded_header_len(1, header.len()).unwrap()
+            + encoded_body_item_len(2, &[1, 128], body_a.len()).unwrap()
+            + encoded_body_item_len(255, &[3], body_b.len()).unwrap();
+        let mut actual = BytesMut::with_capacity(predicted);
+        encode_header(1, &header, &mut actual);
+        encode_body_item(2, &[1, 128], &body_a, &mut actual);
+        encode_body_item(255, &[3], &body_b, &mut actual);
+
+        assert_eq!(actual.len(), predicted);
+        assert_eq!(actual.freeze(), expected.freeze());
     }
 }
