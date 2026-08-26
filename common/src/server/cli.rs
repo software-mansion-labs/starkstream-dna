@@ -37,7 +37,7 @@ pub struct ServerArgs {
     #[clap(
         long = "server.channel-size",
         env = "DNA_SERVER_CHANNEL_SIZE",
-        default_value = "128"
+        default_value = "8"
     )]
     pub server_channel_size: usize,
 }
