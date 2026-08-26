@@ -1,5 +1,6 @@
 //! # OpenTelemetry helpers
 
+mod cloud_logging;
 mod dna_fmt;
 mod request;
 
@@ -25,6 +26,7 @@ use tracing_subscriber::{prelude::*, registry::LookupSpan, EnvFilter, Layer};
 
 pub use opentelemetry::metrics::{Counter, Gauge, Histogram, Meter, UpDownCounter};
 
+pub use self::cloud_logging::init_panic_hook;
 pub use self::request::{RecordRequest, RecordedRequest, RequestMetrics};
 
 const OTEL_SDK_DISABLED: &str = "OTEL_SDK_DISABLED";
@@ -76,6 +78,13 @@ pub fn init_opentelemetry(
         if std::env::var("RUST_LOG").is_err() {
             std::env::set_var("RUST_LOG", "info");
         }
+
+        let package_name = package_name.into();
+        let package_version = package_version.into();
+
+        // Error Reporting groups by service and version, so this has to be set
+        // before the first event is formatted.
+        cloud_logging::set_service_context(package_name.to_string(), package_version.to_string());
 
         let mut layers = vec![stdout()];
 
@@ -159,23 +168,26 @@ where
     let log_env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("INFO"));
 
-    let json_fmt = std::env::var("RUST_LOG_FORMAT")
-        .map(|val| val == "json")
-        .unwrap_or(false);
-
-    if json_fmt {
-        tracing_subscriber::fmt::layer()
+    match std::env::var("RUST_LOG_FORMAT").as_deref() {
+        Ok("json") => tracing_subscriber::fmt::layer()
             .with_ansi(false)
             .with_target(true)
             .json()
             .with_filter(log_env_filter)
-            .boxed()
-    } else {
-        tracing_subscriber::fmt::layer()
+            .boxed(),
+        // Cloud Logging structured entries, with error-level events marked so
+        // Cloud Error Reporting picks them out of the log stream. The panic hook
+        // comes with it: the default one writes a multi-line block that the
+        // logging agent records as unrelated text entries.
+        Ok("gcp") => {
+            cloud_logging::init_panic_hook();
+            cloud_logging::layer().with_filter(log_env_filter).boxed()
+        }
+        _ => tracing_subscriber::fmt::layer()
             .with_ansi(true)
             .event_format(dna_fmt::DnaFormat::default())
             .fmt_fields(dna_fmt::DnaFormat::default())
             .with_filter(log_env_filter)
-            .boxed()
+            .boxed(),
     }
 }
