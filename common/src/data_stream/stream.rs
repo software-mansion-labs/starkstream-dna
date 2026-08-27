@@ -24,7 +24,7 @@ use crate::{
     Cursor,
 };
 
-use super::DataStreamMetrics;
+use super::{ActiveStreamGuard, DataStreamMetrics};
 
 #[derive(Debug)]
 pub struct DataStreamError;
@@ -79,7 +79,7 @@ impl DataStream {
         tx: mpsc::Sender<DataStreamMessage>,
         ct: CancellationToken,
     ) -> Result<(), DataStreamError> {
-        self.metrics.active.add(1, &[]);
+        let _active = ActiveStreamGuard::new(self.metrics.worker_active.clone());
 
         while !ct.is_cancelled() && !tx.is_closed() {
             tokio::select! {
@@ -691,11 +691,5 @@ impl error_stack::Context for DataStreamError {}
 impl std::fmt::Display for DataStreamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "data stream error")
-    }
-}
-
-impl Drop for DataStream {
-    fn drop(&mut self) {
-        self.metrics.active.add(-1, &[]);
     }
 }

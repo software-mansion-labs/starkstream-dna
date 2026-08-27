@@ -772,6 +772,8 @@ dependencies = [
  "google-cloud-storage",
  "hex",
  "memmap2",
+ "opentelemetry 0.31.0",
+ "opentelemetry_sdk 0.31.0",
  "pin-project",
  "prost 0.14.3",
  "rand 0.10.1",
