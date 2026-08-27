@@ -1,4 +1,4 @@
-use apibara_observability::Gauge;
+use starkstream_dna_observability::Gauge;
 
 #[derive(Debug, Clone)]
 pub struct ChainViewMetrics {
@@ -11,7 +11,7 @@ pub struct ChainViewMetrics {
 
 impl Default for ChainViewMetrics {
     fn default() -> Self {
-        let meter = apibara_observability::meter("dna_chain_view");
+        let meter = starkstream_dna_observability::meter("dna_chain_view");
 
         Self {
             up: meter

@@ -1,5 +1,5 @@
 {
-  description = "Apibara development environment";
+  description = "Starkstream DNA development environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -30,14 +30,16 @@
           dna-starknet = {
             description = "The Starknet DNA server";
             path = ./starknet;
+            binary = "starkstream-dna-starknet";
             ports = {
               "7007/tcp" = { };
             };
           };
 
           benchmark = {
-            description = "Apibara benchmark";
+            description = "Starkstream DNA benchmark";
             path = ./benchmark;
+            binary = "starkstream-dna-benchmark";
             ports = { };
           };
         };

@@ -1,5 +1,5 @@
-use apibara_etcd::{EtcdClient, Lock};
 use error_stack::{Result, ResultExt};
+use starkstream_dna_etcd::{EtcdClient, Lock};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 

@@ -1,5 +1,5 @@
-use apibara_etcd::{EtcdClient, KvClient};
 use error_stack::{Result, ResultExt};
+use starkstream_dna_etcd::{EtcdClient, KvClient};
 
 pub static OPTIONS_PREFIX_KEY: &str = "options/";
 pub static CHAIN_SEGMENT_SIZE_KEY: &str = "options/chain_segment_size";

@@ -5,8 +5,8 @@ use clap::Subcommand;
 use error_stack::{Result, ResultExt};
 
 use crate::error::StarknetError;
-use apibara_dna_common::chain::{CanonicalChainBuilder, CanonicalChainSegment};
-use apibara_dna_common::Cursor;
+use starkstream_dna_common::chain::{CanonicalChainBuilder, CanonicalChainSegment};
+use starkstream_dna_common::Cursor;
 
 #[derive(Subcommand, Debug)]
 pub enum CanonCommand {
@@ -142,7 +142,7 @@ impl CanonCommand {
                 // We need to convert the recent segment's canonical blocks to BlockInfo and grow
                 for (i, block) in recent_segment.canonical.iter().enumerate() {
                     let block_number = recent_segment.info.first_block.number + i as u64;
-                    let block_info = apibara_dna_common::chain::BlockInfo {
+                    let block_info = starkstream_dna_common::chain::BlockInfo {
                         number: block_number,
                         hash: block.hash.clone(),
                         parent: if i == 0 {
@@ -220,7 +220,7 @@ fn parse_cursor(s: &str) -> Result<Cursor, StarknetError> {
 
     Ok(Cursor {
         number,
-        hash: apibara_dna_common::Hash(hash_bytes),
+        hash: starkstream_dna_common::Hash(hash_bytes),
     })
 }
 

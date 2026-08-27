@@ -1,6 +1,6 @@
 use testcontainers::{runners::AsyncRunner, ContainerAsync};
 
-use apibara_dna_common::object_store::{
+use starkstream_dna_common::object_store::{
     testing::{
         self, azurite_container, fake_gcs_server_container, minio_container, AzuriteExt,
         FakeGcsServerExt, MinIOExt,

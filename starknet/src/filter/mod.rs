@@ -6,12 +6,12 @@ mod nonce_update;
 mod storage_diff;
 mod transaction;
 
-use apibara_dna_common::{
+use prost::Message;
+use starkstream_dna_common::{
     data_stream::BlockFilterFactory,
     query::{BlockFilter, HeaderFilter},
 };
-use apibara_dna_protocol::starknet;
-use prost::Message;
+use starkstream_dna_protocol::starknet;
 
 pub use self::{
     contract_change::ContractChangeType,

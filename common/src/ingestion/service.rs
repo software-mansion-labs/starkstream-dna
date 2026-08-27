@@ -6,10 +6,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-use apibara_etcd::{EtcdClient, Lock};
-use apibara_observability::{KeyValue, RecordRequest};
 use error_stack::{Result, ResultExt};
 use futures::{stream::FuturesOrdered, Stream, StreamExt};
+use starkstream_dna_etcd::{EtcdClient, Lock};
+use starkstream_dna_observability::{KeyValue, RecordRequest};
 use tokio::{
     task::{JoinError, JoinHandle},
     time::Interval,

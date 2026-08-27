@@ -1,23 +1,25 @@
 [package]
-name = "apibara-dna-starknet"
+name = "starkstream-dna-starknet"
 version = "2.1.0"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+homepage.workspace = true
+publish.workspace = true
 
 [lib]
-name = "apibara_dna_starknet"
+name = "starkstream_dna_starknet"
 path = "src/lib.rs"
 
 [[bin]]
-name = "apibara-dna-starknet"
+name = "starkstream-dna-starknet"
 path = "src/bin.rs"
 
 [dependencies]
-apibara-observability = { path = "../observability" }
-apibara-dna-common = { path = "../common" }
-apibara-dna-protocol = { path = "../protocol" }
+starkstream-dna-observability = { path = "../observability" }
+starkstream-dna-common = { path = "../common" }
+starkstream-dna-protocol = { path = "../protocol" }
 backon.workspace = true
 byte-unit.workspace = true
 bytes.workspace = true

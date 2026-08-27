@@ -1,4 +1,4 @@
-use apibara_dna_common::query::{BlockFilter, Filter};
+use starkstream_dna_common::query::{BlockFilter, Filter};
 
 pub trait BlockFilterExt {
     fn compile_to_block_filter(&self) -> tonic::Result<BlockFilter, tonic::Status>;

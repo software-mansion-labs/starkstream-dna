@@ -6,11 +6,11 @@ mod stream_with_heartbeat;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use apibara_dna_protocol::dna::stream::dna_stream_file_descriptor_set;
-use apibara_observability::Gauge;
 use error::ServerError;
 use error_stack::{Result, ResultExt};
 use service::StreamService;
+use starkstream_dna_observability::Gauge;
+use starkstream_dna_protocol::dna::stream::dna_stream_file_descriptor_set;
 use tokio_util::sync::CancellationToken;
 use tonic::transport::Server as TonicServer;
 use tracing::info;
@@ -84,7 +84,7 @@ where
 
 impl Default for ServerMetrics {
     fn default() -> Self {
-        let meter = apibara_observability::meter("dna_server");
+        let meter = starkstream_dna_observability::meter("dna_server");
 
         Self {
             up: meter

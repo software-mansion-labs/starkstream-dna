@@ -1,6 +1,5 @@
 use std::{path::PathBuf, str::FromStr};
 
-use apibara_observability::mixtrics_registry;
 use bytes::Bytes;
 use clap::Args;
 use error_stack::{Result, ResultExt};
@@ -8,6 +7,7 @@ use foyer::{
     BlockEngineConfig, CacheEntry, Compression, DeviceBuilder, FsDeviceBuilder, HybridCache,
     HybridCacheBuilder, HybridGetOrFetch, PsyncIoEngineConfig, RecoverMode, S3FifoConfig,
 };
+use starkstream_dna_observability::mixtrics_registry;
 
 #[derive(Debug)]
 pub enum FileCacheError {

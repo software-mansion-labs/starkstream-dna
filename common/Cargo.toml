@@ -1,20 +1,22 @@
 [package]
-name = "apibara-dna-common"
+name = "starkstream-dna-common"
 version = "0.0.0"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+homepage.workspace = true
+publish.workspace = true
 
 [lib]
-name = "apibara_dna_common"
+name = "starkstream_dna_common"
 path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0.102"
-apibara-etcd = { path = "../etcd" }
-apibara-observability = { path = "../observability" }
-apibara-dna-protocol = { path = "../protocol" }
+starkstream-dna-etcd = { path = "../etcd" }
+starkstream-dna-observability = { path = "../observability" }
+starkstream-dna-protocol = { path = "../protocol" }
 aws-config = { version = "1.8.15", features = ["behavior-version-latest"] }
 aws-sdk-s3 = "1.129.0"
 azure_identity = "0.21.0"

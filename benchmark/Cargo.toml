@@ -1,23 +1,25 @@
 [package]
-name = "apibara-benchmark"
+name = "starkstream-dna-benchmark"
 version = "2.0.0"
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+homepage.workspace = true
+publish.workspace = true
 
 [lib]
-name = "apibara_benchmark"
+name = "starkstream_dna_benchmark"
 path = "src/lib.rs"
 
 [[bin]]
-name = "apibara-benchmark"
+name = "starkstream-dna-benchmark"
 path = "src/bin.rs"
 
 [dependencies]
-apibara-observability = { path = "../observability" }
-apibara-dna-common = { path = "../common" }
-apibara-dna-protocol = { path = "../protocol" }
+starkstream-dna-observability = { path = "../observability" }
+starkstream-dna-common = { path = "../common" }
+starkstream-dna-protocol = { path = "../protocol" }
 byte-unit.workspace = true
 clap.workspace = true
 ctrlc.workspace = true

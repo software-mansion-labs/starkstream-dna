@@ -57,7 +57,7 @@ pub fn mixtrics_registry(name: &'static str) -> BoxedRegistry {
 /// It should be called once during the application startup.
 ///
 /// ```rs
-/// use apibara_observability::init_opentelemetry;
+/// use starkstream_dna_observability::init_opentelemetry;
 ///
 /// init_opentelemetry(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")).unwrap();
 /// ```

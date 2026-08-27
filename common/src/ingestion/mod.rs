@@ -4,8 +4,8 @@ mod metrics;
 mod service;
 pub mod state_client;
 
-use apibara_etcd::{EtcdClient, LockOptions};
 use error_stack::{Result, ResultExt};
+use starkstream_dna_etcd::{EtcdClient, LockOptions};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
@@ -35,7 +35,7 @@ pub async fn ingestion_service_loop<I>(
 where
     I: BlockIngestion + Send + Sync + 'static,
 {
-    use apibara_observability::KeyValue;
+    use starkstream_dna_observability::KeyValue;
 
     let metrics = IngestionMetrics::default();
 

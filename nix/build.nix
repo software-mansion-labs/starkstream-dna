@@ -66,7 +66,7 @@ let
   cargoArtifacts = craneLib.buildDepsOnly (
     commonArgs
     // {
-      pname = "apibara";
+      pname = "starkstream-dna";
       version = "0.0.0";
     }
   );
@@ -75,7 +75,7 @@ let
     commonArgs
     // {
       inherit cargoArtifacts;
-      pname = "apibara";
+      pname = "starkstream-dna";
       version = "0.0.0";
       doCheck = false;
     }
@@ -86,7 +86,7 @@ let
     commonArgs
     // {
       inherit cargoArtifacts;
-      pname = "apibara";
+      pname = "starkstream-dna";
       version = "0.0.0";
     }
   );
@@ -96,7 +96,7 @@ let
     commonArgs
     // {
       inherit cargoArtifacts;
-      pname = "apibara";
+      pname = "starkstream-dna";
       version = "0.0.0";
     }
   );
@@ -106,7 +106,7 @@ let
     commonArgs
     // {
       inherit cargoArtifacts;
-      pname = "apibara";
+      pname = "starkstream-dna";
       version = "0.0.0";
       cargoNextestExtraArgs = "-E 'kind(lib)'";
     }
@@ -117,7 +117,7 @@ let
     commonArgs
     // {
       inherit cargoArtifacts;
-      pname = "apibara-nextest-archive";
+      pname = "starkstream-dna-nextest-archive";
       version = "0.0.0";
       doCheck = true;
 
@@ -169,7 +169,7 @@ let
       out = buildCrate {
         inherit (crate) path;
       };
-      meta = { inherit (crate) description ports; };
+      meta = { inherit (crate) binary description ports; };
     })
     crates;
 
@@ -251,12 +251,12 @@ let
           ];
           config = {
             Entrypoint = [
-              "${crate.out}/bin/apibara-${name}"
+              "${crate.out}/bin/${crate.meta.binary}"
             ];
             ExposedPorts = crate.meta.ports;
             Labels = (
               {
-                "org.opencontainers.image.source" = "https://github.com/apibara/dna";
+                "org.opencontainers.image.source" = "https://github.com/software-mansion-labs/starkstream-dna";
                 "org.opencontainers.image.licenses" = "Apache-2.0";
               }
               // (

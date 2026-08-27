@@ -1,4 +1,4 @@
-// Apibara DNA server V2
+// Starkstream DNA server V2
 syntax = "proto3";
 
 package dna.v2.stream;

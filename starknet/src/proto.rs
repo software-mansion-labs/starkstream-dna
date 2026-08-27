@@ -1,4 +1,4 @@
-use apibara_dna_protocol::starknet;
+use starkstream_dna_protocol::starknet;
 
 use crate::provider::models;
 

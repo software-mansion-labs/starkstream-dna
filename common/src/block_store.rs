@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context};
-use apibara_observability::{Counter, KeyValue};
 use bytes::Bytes;
 use error_stack::{Result, ResultExt};
+use starkstream_dna_observability::{Counter, KeyValue};
 
 use crate::{
     chain::PendingBlockInfo,
@@ -444,7 +444,7 @@ impl std::fmt::Display for BlockStoreError {
 
 impl Default for BlockStoreMetrics {
     fn default() -> Self {
-        let meter = apibara_observability::meter("dna_block_store");
+        let meter = starkstream_dna_observability::meter("dna_block_store");
 
         Self {
             block_count: meter.u64_counter("dna.block_store.get_block").build(),

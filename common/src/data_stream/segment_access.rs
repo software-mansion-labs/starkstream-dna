@@ -1,10 +1,10 @@
 use std::{collections::HashMap, time::Instant};
 
-use apibara_observability::RecordedRequest;
 use bytes::Bytes;
 use error_stack::{Result, ResultExt};
 use foyer::HybridCacheEntry;
 use roaring::RoaringBitmap;
+use starkstream_dna_observability::RecordedRequest;
 
 use crate::{
     core::Cursor,

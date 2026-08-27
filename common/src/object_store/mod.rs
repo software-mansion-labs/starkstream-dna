@@ -1,6 +1,6 @@
-use apibara_etcd::normalize_prefix;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use error_stack::{Result, ResultExt};
+use starkstream_dna_etcd::normalize_prefix;
 use tracing::{debug, info};
 
 mod aws_s3;

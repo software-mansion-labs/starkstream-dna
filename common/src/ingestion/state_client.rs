@@ -1,6 +1,6 @@
-use apibara_etcd::{EtcdClient, KvClient, WatchClient};
 use error_stack::{Result, ResultExt};
 use futures::{Stream, StreamExt};
+use starkstream_dna_etcd::{EtcdClient, KvClient, WatchClient};
 use tokio_util::sync::CancellationToken;
 
 use crate::chain_store::RecentSegmentPointer;
@@ -481,8 +481,8 @@ mod tests {
 }
 
 pub mod testing {
-    use apibara_etcd::EtcdClient;
     use futures::Future;
+    use starkstream_dna_etcd::EtcdClient;
     use testcontainers::{
         core::{wait::LogWaitStrategy, ContainerPort, WaitFor},
         ContainerAsync, Image,

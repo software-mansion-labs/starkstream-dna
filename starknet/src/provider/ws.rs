@@ -1,11 +1,11 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use apibara_dna_common::{Cursor, Hash};
 use error_stack::{Result, ResultExt};
 use futures::stream::SplitStream;
 use futures::{SinkExt, Stream, StreamExt};
 use starknet_rust::core::types::ConfirmedBlockId;
+use starkstream_dna_common::{Cursor, Hash};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};

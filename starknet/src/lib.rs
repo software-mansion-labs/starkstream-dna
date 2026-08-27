@@ -1,4 +1,3 @@
-use apibara_dna_common::{fragment::FragmentInfo, ChainSupport};
 use filter::StarknetFilterFactory;
 use fragment::{
     CONTRACT_CHANGE_FRAGMENT_ID, CONTRACT_CHANGE_FRAGMENT_NAME, EVENT_FRAGMENT_ID,
@@ -9,6 +8,7 @@ use fragment::{
 };
 use ingestion::StarknetBlockIngestion;
 use provider::StarknetProvider;
+use starkstream_dna_common::{fragment::FragmentInfo, ChainSupport};
 
 pub use ingestion::StarknetBlockIngestionOptions;
 pub use provider::{NewHeadMessage, NewHeadsStream};

@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use apibara_etcd::EtcdClient;
 use bytes::Bytes;
 use error_stack::{Result, ResultExt};
 use foyer::HybridCacheBuilder;
+use starkstream_dna_etcd::EtcdClient;
 use testcontainers::{runners::AsyncRunner, ContainerAsync};
 
-use apibara_dna_common::{
+use starkstream_dna_common::{
     chain::{BlockInfo, CanonicalBlock, CanonicalChainSegment, CanonicalChainSegmentInfo},
     chain_store::ChainStore,
     file_cache::FileCache,
@@ -25,8 +25,8 @@ use apibara_dna_common::{
 use testing::{BlockNumberOrTag, TestChain};
 use tokio_util::sync::CancellationToken;
 
-async fn get_test_head(provider: &std::sync::Arc<TestChain>) -> apibara_dna_common::Cursor {
-    use apibara_dna_common::{Cursor, Hash};
+async fn get_test_head(provider: &std::sync::Arc<TestChain>) -> starkstream_dna_common::Cursor {
+    use starkstream_dna_common::{Cursor, Hash};
     let header = provider.get_header(BlockNumberOrTag::Latest).await;
     let hash = Hash(header.hash.to_vec());
     Cursor::new(header.number, hash)

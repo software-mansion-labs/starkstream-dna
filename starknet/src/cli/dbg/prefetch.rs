@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use error_stack::{Result, ResultExt};
 use prost::Message;
 
-use apibara_dna_common::{
+use clap::Args;
+use starkstream_dna_common::{
     cli::{EtcdArgs, ObjectStoreArgs},
     dbg::run_debug_prefetch_stream,
     file_cache::FileCacheArgs,
@@ -12,8 +13,7 @@ use apibara_dna_common::{
         JOIN_FRAGMENT_ID, JOIN_FRAGMENT_NAME,
     },
 };
-use apibara_dna_protocol::starknet;
-use clap::Args;
+use starkstream_dna_protocol::starknet;
 use tokio_util::sync::CancellationToken;
 
 use crate::{

@@ -1,4 +1,4 @@
-use apibara_observability::{Counter, Histogram, RequestMetrics, UpDownCounter};
+use starkstream_dna_observability::{Counter, Histogram, RequestMetrics, UpDownCounter};
 
 #[derive(Debug, Clone)]
 pub struct DataStreamMetrics {
@@ -16,7 +16,7 @@ pub struct DataStreamMetrics {
 
 impl Default for DataStreamMetrics {
     fn default() -> Self {
-        let meter = apibara_observability::meter("dna_data_stream");
+        let meter = starkstream_dna_observability::meter("dna_data_stream");
 
         Self {
             active: meter

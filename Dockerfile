@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-# Build stage: compile apibara-dna-starknet from source.
+# Build stage: compile starkstream-dna-starknet from source.
 # Keep the tag in step with rust-toolchain.toml, or every build re-downloads the
 # toolchain. Base images are tags, not digests, so a commit does not build
 # reproducibly; what the release contract rests on is release.yml building a
@@ -31,8 +31,8 @@ COPY . .
 # so CI compiles from scratch. Fixing that needs cargo-chef or equivalent.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/target \
-    cargo build --release --locked -p apibara-dna-starknet \
- && cp /src/target/release/apibara-dna-starknet /usr/local/bin/apibara-dna-starknet
+    cargo build --release --locked -p starkstream-dna-starknet \
+ && cp /src/target/release/starkstream-dna-starknet /usr/local/bin/starkstream-dna-starknet
 
 # Runtime stage: slim debian with TLS roots.
 FROM debian:bookworm-slim AS runtime
@@ -47,7 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && useradd --system --uid 65532 --gid 65532 --no-create-home dna \
     && install -d -o 65532 -g 65532 /data
 
-COPY --from=builder /usr/local/bin/apibara-dna-starknet /usr/local/bin/apibara-dna-starknet
+COPY --from=builder /usr/local/bin/starkstream-dna-starknet /usr/local/bin/starkstream-dna-starknet
 
 USER 65532:65532
 WORKDIR /data
@@ -58,5 +58,5 @@ ENV DNA_CACHE_DIR=/data
 
 EXPOSE 7007
 
-ENTRYPOINT ["/usr/local/bin/apibara-dna-starknet"]
+ENTRYPOINT ["/usr/local/bin/starkstream-dna-starknet"]
 CMD ["start"]

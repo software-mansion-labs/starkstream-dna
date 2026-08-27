@@ -1,4 +1,4 @@
-use apibara_observability::{Gauge, Histogram, RequestMetrics};
+use starkstream_dna_observability::{Gauge, Histogram, RequestMetrics};
 
 #[derive(Debug, Clone)]
 pub struct IngestionMetrics {
@@ -15,7 +15,7 @@ pub struct IngestionMetrics {
 
 impl Default for IngestionMetrics {
     fn default() -> Self {
-        let meter = apibara_observability::meter("dna_ingestion");
+        let meter = starkstream_dna_observability::meter("dna_ingestion");
 
         Self {
             up: meter

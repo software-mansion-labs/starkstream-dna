@@ -1,7 +1,7 @@
-use apibara_benchmark::{BenchmarkError, Cli};
-use apibara_observability::init_opentelemetry;
 use clap::Parser;
 use error_stack::{Result, ResultExt};
+use starkstream_dna_benchmark::{BenchmarkError, Cli};
+use starkstream_dna_observability::init_opentelemetry;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
