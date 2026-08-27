@@ -49,8 +49,6 @@
           workspaceDir = ./.;
         };
 
-        ci = pkgs.callPackage ./nix/ci.nix { };
-
       in
       {
         # format with `nix fmt`
@@ -60,7 +58,7 @@
         checks = buildArtifacts.checks;
 
         # development shells. start with `nix develop`.
-        devShells = (buildArtifacts.shell // ci.shell // { });
+        devShells = (buildArtifacts.shell // { });
 
         # all packages.
         # show them with `nix flake show`.
