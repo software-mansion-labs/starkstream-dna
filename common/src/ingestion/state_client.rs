@@ -481,8 +481,6 @@ mod tests {
 }
 
 pub mod testing {
-    use std::borrow::Cow;
-
     use apibara_etcd::EtcdClient;
     use futures::Future;
     use testcontainers::{
@@ -498,11 +496,11 @@ pub mod testing {
 
     impl Image for EtcdServer {
         fn name(&self) -> &str {
-            "bitnami/etcd"
+            "gcr.io/etcd-development/etcd"
         }
 
         fn tag(&self) -> &str {
-            "latest"
+            "v3.5.33"
         }
 
         fn ready_conditions(&self) -> Vec<WaitFor> {
@@ -511,10 +509,12 @@ pub mod testing {
             ))]
         }
 
-        fn env_vars(
-            &self,
-        ) -> impl IntoIterator<Item = (impl Into<Cow<'_, str>>, impl Into<Cow<'_, str>>)> {
-            vec![("ALLOW_NONE_AUTHENTICATION".to_string(), "yes".to_string())]
+        fn cmd(&self) -> impl IntoIterator<Item = impl Into<std::borrow::Cow<'_, str>>> {
+            vec![
+                "/usr/local/bin/etcd",
+                "--listen-client-urls=http://0.0.0.0:2379",
+                "--advertise-client-urls=http://0.0.0.0:2379",
+            ]
         }
 
         fn expose_ports(&self) -> &[ContainerPort] {
