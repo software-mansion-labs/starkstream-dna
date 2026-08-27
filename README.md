@@ -1,71 +1,96 @@
-<p align="center">
-    <img width="400" src="https://user-images.githubusercontent.com/282580/176315678-e7ab5a9b-5561-41e4-b314-62f99fd90d2f.png" />
-</p>
+# Starkstream DNA
 
----
+Starkstream DNA is a high-performance Starknet data server. It ingests Starknet
+blocks, maintains a reorg-aware canonical history, and exposes filtered data over
+the DNA gRPC streaming protocol.
 
-# Apibara Direct Node Access and SDK
+This repository contains the Starknet server and its internal Rust crates. EVM,
+Beacon Chain, and the former Rust client SDK are not part of this distribution.
+The TypeScript SDK is maintained separately in
+[apibara-typescript-sdk](https://github.com/software-mansion-labs/apibara-typescript-sdk)
+while its Starkstream migration is completed.
 
-This repository contains the canonical implementation of the Apibara Direct Node
-Access (DNA) protocol and the integrations built on top of it.\
-The protocol enables developers to easily and efficiently stream any onchain
-data directly into their application.
+> [!NOTE]
+> Documentation is being rebuilt. Until it launches, this repository's README,
+> crate rustdoc, and protobuf definitions are the canonical technical reference.
 
-## Contributing
+## Architecture
 
-We are open to contributions.
+The server reads Starknet data through JSON-RPC and WebSocket providers, turns
+it into indexed fragments, stores canonical and compacted segments in an object
+store, and serves filtered streams over gRPC. Etcd coordinates ingestion state,
+leases, and mutable pointers; persisted block data remains in the configured
+object store.
 
--   Read the
-    [CONTRIBUTING.md](https://github.com/apibara/dna/blob/main/CONTRIBUTING.md)
-    guide to learn more about the process.
--   Some contributions are [rewarded on OnlyDust](https://app.onlydust.com/p/apibara).
-    If you're interested in paid contributions, get in touch before submitting a PR.
+The workspace is split into these private packages:
+
+| Package | Responsibility |
+|---|---|
+| `starkstream-dna-starknet` | Starknet provider, ingestion, filters, CLI, and production binary |
+| `starkstream-dna-common` | Reorg-aware ingestion, storage, compaction, and gRPC server infrastructure |
+| `starkstream-dna-protocol` | Generated DNA stream and Starknet protobuf types used by the server |
+| `starkstream-dna-etcd` | Etcd client, locking, key/value, and watch helpers |
+| `starkstream-dna-observability` | Tracing, metrics, and OpenTelemetry helpers |
+| `starkstream-dna-benchmark` | Starknet stream benchmark utility |
+
+See [Architecture](docs/architecture.md) for the component flow and
+[Compatibility](docs/compatibility.md) for the identifiers that deliberately
+retain DNA naming.
 
 ## Development
 
-Apibara DNA is developed against stable Rust. We provide a
-[nix](https://nixos.org/) environment to simplify installing all dependencies
-required by the project.
+The repository uses stable Rust and provides a Nix development environment with
+the required native dependencies and protobuf compiler:
 
--   if you have nix installed, simply run `nix develop`.
--   if you don't have nix installed, you should install Rust using your favorite
-    tool.
+```sh
+nix develop --accept-flake-config
+cargo check --workspace --all-targets
+```
 
-## Platform Support
+Run the same build and test boundaries used by CI:
 
-**Tier 1**
+```sh
+nix flake check -L --accept-flake-config
+nix build .#unit-tests -L --accept-flake-config
+nix build .#integration-tests-archive -L --accept-flake-config
+nix develop .#integration --accept-flake-config -c run-integration-tests
+nix build .#all-crates -L --accept-flake-config
+```
 
-These platforms are tested against every pull request.
+Integration tests require access to a Docker daemon for their Etcd and
+object-store test containers.
 
--   linux-x86_64
--   macos-aarch64
+Build the Starknet binary with Nix:
 
-**Tier 2**
+```sh
+nix build .#dna-starknet -L --accept-flake-config
+./result/bin/starkstream-dna-starknet start --help
+```
 
-These platform are tested on new releases.
+## Compatibility
 
--   linux-aarch64 - used for multi-arch docker images.
+The repository and Rust package names changed, but deployed protocol and state
+contracts did not. In particular, `dna.v2.stream`, `starknet.v2`, `DNA_*` and
+`STARKNET_*` configuration, `dna_*` metrics, persisted keys and object prefixes,
+the `dna-starknet` image repository, and the `dna-starknet-release` event remain
+stable. The package and repository migration is summarized in
+[Compatibility](docs/compatibility.md); see [Architecture](docs/architecture.md)
+for the resulting Starknet-only component layout.
 
-**Unsupported**
+## Releases
 
-These platforms are not supported.
+Images are built from `main`, published immutably to the dedicated
+`dna-starknet` Artifact Registry repository, and promoted by digest through the
+infrastructure repository. This repository does not deploy to Kubernetes.
+Maintainers should follow [RELEASE.md](RELEASE.md).
 
--   windows - if you're a developer using Windows, we recommend the [Windows
-    Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/).
--   macos-x86_64 - given the slowness of CI runners for this platform, we cannot
-    provide builds for it.
+## Contributing
 
-## License
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, tests, and pull-request
+guidance.
 
-Copyright 2025 GNC Labs Limited
+## History and license
 
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use
-this file except in compliance with the License. You may obtain a copy of the
-License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software distributed
-under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-CONDITIONS OF ANY KIND, either express or implied. See the License for the
-specific language governing permissions and limitations under the License.
+Starkstream DNA builds on the original Apibara DNA codebase and preserves its
+contributors' work and attribution. The project is licensed under the
+[Apache License 2.0](LICENSE.txt).
