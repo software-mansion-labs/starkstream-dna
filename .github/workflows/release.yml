@@ -1,0 +1,210 @@
+name: Release DNA Starknet image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  # actions: read to look up this commit's CI Pipeline run.
+  actions: read
+  contents: read
+  id-token: write
+
+concurrency:
+  # One group for the whole release: a run promotes both networks at once, and the
+  # infra repo force-pushes both branches of the stack. queue: max because the
+  # default cancels an older pending run. Same-commit runs may still race; the
+  # digest readback below fails whichever one has the tag moved under it.
+  group: dna-starknet-release
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish immutable image and request promotion
+    runs-on: ubuntu-latest
+    # A release compiles the workspace from scratch; see the Dockerfile.
+    timeout-minutes: 90
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/dna-starknet/dna-starknet
+      SOURCE_COMMIT: ${{ github.sha }}
+
+    steps:
+      - name: Require the main branch
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Releases must be dispatched from the main branch."
+            exit 1
+          fi
+
+      - name: Require a CI-verified commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Require CI Pipeline's own run on main, not "every check is green": an
+          # unrelated app's check must not stand in for CI. event=push also
+          # excludes a pull_request run sharing this SHA.
+          run="$(
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/ci-pipeline.yml/runs?head_sha=${SOURCE_COMMIT}&event=push&per_page=1" \
+              --jq '.workflow_runs[0] // empty | {status, conclusion: (.conclusion // "pending"), url: .html_url}'
+          )"
+
+          if [ -z "${run}" ]; then
+            echo "CI Pipeline never ran on main for ${SOURCE_COMMIT}. Releases must come"
+            echo "from a commit that landed on main through a pull request."
+            exit 1
+          fi
+
+          jq . <<<"${run}"
+
+          status="$(jq --raw-output '.status' <<<"${run}")"
+          conclusion="$(jq --raw-output '.conclusion' <<<"${run}")"
+
+          if [ "${status}" != "completed" ]; then
+            echo "CI Pipeline is still ${status} for ${SOURCE_COMMIT}. Wait for it to finish."
+            exit 1
+          fi
+
+          if [ "${conclusion}" != "success" ]; then
+            echo "The most recent CI Pipeline run for ${SOURCE_COMMIT} concluded ${conclusion}."
+            exit 1
+          fi
+
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Configure Artifact Registry authentication
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Reuse the image if this commit was already published
+        id: published
+        shell: bash
+        run: |
+          # A re-dispatch for a commit that was already released must not rebuild:
+          # that would mint a second digest for the same source. Only a
+          # missing tag may fall through to a build, which is why this uses
+          # `images list`: absent is empty output and exit 0, a real failure is a
+          # non-zero exit.
+          digest="$(
+            gcloud artifacts docker images list "${IMAGE}" \
+              --include-tags \
+              --format=json \
+              | jq --raw-output --arg tag "git-${SOURCE_COMMIT}" \
+                  'map(select((.tags // []) | index($tag))) | .[0].version // empty'
+          )"
+
+          if [ -z "${digest}" ]; then
+            echo "No image published for this commit yet; building it."
+            echo "digest=" >>"${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Unexpected digest for git-${SOURCE_COMMIT}: ${digest}"
+            exit 1
+          fi
+
+          echo "Reusing the published image ${digest}."
+          echo "digest=${digest}" >>"${GITHUB_OUTPUT}"
+
+      - name: Build and publish image
+        id: build
+        if: steps.published.outputs.digest == ''
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          target: runtime
+          # Single platform: the infra repo reads labels via `imagetools inspect
+          # --format '{{json .Image.Config.Labels}}'`, which goes null once the
+          # index holds more than one platform.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:git-${{ env.SOURCE_COMMIT }}
+          labels: |
+            org.opencontainers.image.revision=${{ env.SOURCE_COMMIT }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          attests: |
+            type=provenance,mode=max
+            type=sbom
+          # Caches the builder stage's apt layer only; the compile layer is
+          # invalidated every commit. mode=max because mode=min would export only
+          # the target stage, missing the apt install entirely.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Resolve released digest
+        id: image
+        shell: bash
+        env:
+          PUBLISHED_DIGEST: ${{ steps.published.outputs.digest }}
+          BUILT_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          # Both paths name the digest by reading the tag back, so the readback is
+          # also the check that nothing moved the tag under this run.
+          digest="$(
+            gcloud artifacts docker images describe "${IMAGE}:git-${SOURCE_COMMIT}" \
+              --format='value(image_summary.digest)'
+          )"
+
+          if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Could not determine the released image digest."
+            exit 1
+          fi
+
+          if [ -n "${BUILT_DIGEST}" ] && [ "${digest}" != "${BUILT_DIGEST}" ]; then
+            echo "git-${SOURCE_COMMIT} resolves to ${digest} but this run pushed"
+            echo "${BUILT_DIGEST}. Something else moved the tag; refusing to"
+            echo "promote a digest this run did not produce."
+            exit 1
+          fi
+
+          if [ -n "${PUBLISHED_DIGEST}" ] && [ "${digest}" != "${PUBLISHED_DIGEST}" ]; then
+            echo "git-${SOURCE_COMMIT} moved from ${PUBLISHED_DIGEST} to ${digest}"
+            echo "during this run."
+            exit 1
+          fi
+
+          echo "Releasing ${digest}."
+          echo "digest=${digest}" >>"${GITHUB_OUTPUT}"
+
+      - name: Create infrastructure dispatch token
+        id: infra-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.INFRA_DNA_APP_ID }}
+          private-key: ${{ secrets.INFRA_DNA_APP_PRIVATE_KEY }}
+          owner: software-mansion
+          repositories: starkstream-infra
+          permission-contents: write
+
+      - name: Request the promotion stack
+        run: |
+          # One dispatch covers both networks: the infra repo opens a testnet
+          # pull request and a mainnet one stacked on top of it.
+          gh api \
+            --method POST \
+            repos/software-mansion/starkstream-infra/dispatches \
+            --field event_type=dna-starknet-release \
+            --field "client_payload[source_commit]=${SOURCE_COMMIT}" \
+            --field "client_payload[dna_digest]=${DNA_DIGEST}"
+        env:
+          GH_TOKEN: ${{ steps.infra-token.outputs.token }}
+          DNA_DIGEST: ${{ steps.image.outputs.digest }}

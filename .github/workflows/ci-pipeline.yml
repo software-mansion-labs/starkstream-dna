@@ -1,11 +1,21 @@
 name: CI Pipeline
 
 concurrency:
-  group: pipeline-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Main is grouped per commit: a shared group keeps one pending run and would
+  # cancel a queued commit's, locking it out of a release for good. Pull requests
+  # group per pull request, where superseding is the point.
+  group: pipeline-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 on:
   merge_group:
+
+  # release.yml verifies a commit's own run, and a pull request's checks belong to
+  # its head commit, not to what lands on main. Costs a second CI run per merge; a
+  # merge queue would collapse it back to one.
+  push:
+    branches:
+      - main
 
   pull_request:
     types:
