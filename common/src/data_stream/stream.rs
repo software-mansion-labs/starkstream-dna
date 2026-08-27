@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    future::Future,
+};
 
 use apibara_dna_protocol::dna::stream::{
     stream_data_response::Message, Data, DataFinality, DataProduction, Finalize, Invalidate,
@@ -82,15 +85,12 @@ impl DataStream {
         let _active = ActiveStreamGuard::new(self.metrics.worker_active.clone());
 
         while !ct.is_cancelled() && !tx.is_closed() {
-            tokio::select! {
-                biased;
+            let Some(res) = tick_until_closed(&tx, &ct, self.tick(&tx, &ct)).await else {
+                break;
+            };
 
-                _ = ct.cancelled() => break,
-                res = self.tick(&tx, &ct) => {
-                    res.change_context(DataStreamError)
-                        .attach_printable("failed to tick data stream")?;
-                },
-            }
+            res.change_context(DataStreamError)
+                .attach_printable("failed to tick data stream")?;
         }
 
         Ok(())
@@ -686,10 +686,56 @@ impl DataStream {
     }
 }
 
+async fn tick_until_closed<T, F>(
+    tx: &mpsc::Sender<T>,
+    ct: &CancellationToken,
+    tick: F,
+) -> Option<F::Output>
+where
+    F: Future,
+{
+    tokio::select! {
+        biased;
+
+        _ = ct.cancelled() => None,
+        _ = tx.closed() => None,
+        result = tick => Some(result),
+    }
+}
+
 impl error_stack::Context for DataStreamError {}
 
 impl std::fmt::Display for DataStreamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "data stream error")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::future::pending;
+
+    use tokio::sync::mpsc;
+    use tokio_util::sync::CancellationToken;
+
+    use super::tick_until_closed;
+
+    #[tokio::test]
+    async fn receiver_close_interrupts_pending_tick() {
+        let (tx, rx) = mpsc::channel::<()>(1);
+        let ct = CancellationToken::new();
+        let worker =
+            tokio::spawn(async move { tick_until_closed(&tx, &ct, pending::<()>()).await });
+
+        tokio::task::yield_now().await;
+        assert!(!worker.is_finished());
+
+        drop(rx);
+
+        let result = tokio::time::timeout(std::time::Duration::from_secs(1), worker)
+            .await
+            .expect("worker should observe the closed receiver")
+            .expect("worker should not panic");
+        assert_eq!(result, None);
     }
 }

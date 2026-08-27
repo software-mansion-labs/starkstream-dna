@@ -208,8 +208,9 @@ where
             self.metrics.clone(),
         );
         let (tx, rx) = mpsc::channel(self.options.channel_size);
+        let stream_ct = self.ct.child_token();
 
-        tokio::spawn(ds.start(tx, self.ct.clone()).inspect_err(|err| {
+        tokio::spawn(ds.start(tx, stream_ct.clone()).inspect_err(|err| {
             error!(error = ?err, "data stream error");
         }));
 
@@ -217,6 +218,7 @@ where
             rx,
             heartbeat_interval,
             ActiveStreamGuard::new(self.metrics.active.clone()),
+            stream_ct,
         );
 
         Ok(tonic::Response::new(stream))
