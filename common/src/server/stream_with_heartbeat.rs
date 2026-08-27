@@ -8,21 +8,29 @@ use apibara_dna_protocol::dna::stream::{stream_data_response, StreamDataResponse
 use futures::Stream;
 use tokio::{sync::mpsc, time::Interval};
 
+use crate::data_stream::ActiveStreamGuard;
+
 pub struct ResponseStreamWithHeartbeat {
     rx: mpsc::Receiver<Result<StreamDataResponse, tonic::Status>>,
     interval: Interval,
+    _active: ActiveStreamGuard,
 }
 
 impl ResponseStreamWithHeartbeat {
-    pub fn new(
+    pub(crate) fn new(
         rx: mpsc::Receiver<Result<StreamDataResponse, tonic::Status>>,
         heartbeat_interval: Duration,
+        active: ActiveStreamGuard,
     ) -> Self {
         let mut interval = tokio::time::interval(heartbeat_interval);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         interval.reset();
 
-        Self { rx, interval }
+        Self {
+            rx,
+            interval,
+            _active: active,
+        }
     }
 }
 

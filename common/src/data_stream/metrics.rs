@@ -2,7 +2,10 @@ use apibara_observability::{Counter, Histogram, RequestMetrics, UpDownCounter};
 
 #[derive(Debug, Clone)]
 pub struct DataStreamMetrics {
+    /// Number of client-facing data streams returned by the RPC service.
     pub active: UpDownCounter<i64>,
+    /// Number of background workers serving data streams.
+    pub worker_active: UpDownCounter<i64>,
     pub block_size: Histogram<u64>,
     pub fragment_size: Histogram<u64>,
     pub time_in_queue: Histogram<f64>,
@@ -21,7 +24,12 @@ impl Default for DataStreamMetrics {
         Self {
             active: meter
                 .i64_up_down_counter("dna.data_stream.active")
-                .with_description("number of active data streams")
+                .with_description("number of active client data streams")
+                .with_unit("{connection}")
+                .build(),
+            worker_active: meter
+                .i64_up_down_counter("dna.data_stream.worker_active")
+                .with_description("number of active data stream workers")
                 .with_unit("{connection}")
                 .build(),
             block_size: meter
@@ -106,5 +114,77 @@ impl Default for DataStreamMetrics {
                 .with_description("number of group cache hits")
                 .build(),
         }
+    }
+}
+
+/// Keeps an active metric balanced over the lifetime of the guarded value.
+#[derive(Debug)]
+pub(crate) struct ActiveStreamGuard {
+    active: UpDownCounter<i64>,
+}
+
+impl ActiveStreamGuard {
+    pub(crate) fn new(active: UpDownCounter<i64>) -> Self {
+        active.add(1, &[]);
+        Self { active }
+    }
+}
+
+impl Drop for ActiveStreamGuard {
+    fn drop(&mut self) {
+        self.active.add(-1, &[]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use opentelemetry::metrics::MeterProvider as _;
+    use opentelemetry_sdk::metrics::{
+        data::{AggregatedMetrics, MetricData},
+        InMemoryMetricExporter, SdkMeterProvider,
+    };
+
+    use super::ActiveStreamGuard;
+
+    #[test]
+    fn active_stream_guard_balances_metric() {
+        let exporter = InMemoryMetricExporter::default();
+        let provider = SdkMeterProvider::builder()
+            .with_periodic_exporter(exporter.clone())
+            .build();
+        let active = provider
+            .meter("active_stream_guard_test")
+            .i64_up_down_counter("active")
+            .build();
+
+        let guard = ActiveStreamGuard::new(active);
+        provider.force_flush().expect("metric flush should succeed");
+        assert_eq!(metric_value(&exporter), 1);
+
+        drop(guard);
+        provider.force_flush().expect("metric flush should succeed");
+        assert_eq!(metric_value(&exporter), 0);
+    }
+
+    fn metric_value(exporter: &InMemoryMetricExporter) -> i64 {
+        let resource_metrics = exporter
+            .get_finished_metrics()
+            .expect("metrics should be available");
+        let metric = resource_metrics
+            .last()
+            .and_then(|resource| resource.scope_metrics().next())
+            .and_then(|scope| scope.metrics().find(|metric| metric.name() == "active"))
+            .expect("active metric should exist");
+
+        let AggregatedMetrics::I64(MetricData::Sum(sum)) = metric.data() else {
+            panic!("active metric should be an i64 sum");
+        };
+
+        let value = sum
+            .data_points()
+            .next()
+            .expect("active metric should have a data point")
+            .value();
+        value
     }
 }

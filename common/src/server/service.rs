@@ -13,7 +13,7 @@ use tracing::{debug, error, info};
 use crate::{
     block_store::BlockStoreReader,
     chain_view::{CanonicalCursor, ChainView, ChainViewError, ValidatedCursor},
-    data_stream::{BlockFilterFactory, DataStream, DataStreamMetrics},
+    data_stream::{ActiveStreamGuard, BlockFilterFactory, DataStream, DataStreamMetrics},
     fragment::FragmentId,
     server::stream_with_heartbeat::ResponseStreamWithHeartbeat,
     Cursor,
@@ -213,7 +213,11 @@ where
             error!(error = ?err, "data stream error");
         }));
 
-        let stream = ResponseStreamWithHeartbeat::new(rx, heartbeat_interval);
+        let stream = ResponseStreamWithHeartbeat::new(
+            rx,
+            heartbeat_interval,
+            ActiveStreamGuard::new(self.metrics.active.clone()),
+        );
 
         Ok(tonic::Response::new(stream))
     }

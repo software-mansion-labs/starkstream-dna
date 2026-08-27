@@ -8,6 +8,7 @@ mod stream_group;
 
 pub use self::filter::{BlockFilterFactory, FilterMatch};
 pub use self::fragment_access::FragmentAccess;
+pub(crate) use self::metrics::ActiveStreamGuard;
 pub use self::metrics::DataStreamMetrics;
 pub use self::segment_access::{SegmentAccess, SegmentAccessFetch};
 pub use self::segment_stream::SegmentStream;
