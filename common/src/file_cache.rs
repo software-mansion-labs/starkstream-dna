@@ -102,7 +102,10 @@ pub struct FileCacheArgs {
         default_value = "2"
     )]
     pub cache_flusher_count: usize,
-    /// Set the flush buffer pool size.
+    /// Set the logical flush buffer pool size passed to each Foyer cache.
+    ///
+    /// DNA creates two caches and Foyer keeps two buffers per flusher, so fixed
+    /// process memory for flush buffers is approximately four times this value.
     #[clap(
         long = "cache.flush-buffer-pool-size",
         env = "DNA_CACHE_FLUSH_BUFFER_POOL_SIZE",
@@ -145,6 +148,10 @@ impl FileCacheArgs {
                 )
             })?
             .as_u64();
+
+        // This per-cache pool is shared among the flushers. Foyer double-buffers
+        // every flusher, and DNA builds two caches, so resident flush buffers are
+        // approximately: configured pool × 2 buffers × 2 caches.
 
         let general = {
             let max_size_memory_bytes = byte_unit::Byte::from_str(&self.cache_data_memory_size)
