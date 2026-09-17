@@ -22,9 +22,7 @@ use super::format::decorate_as_reported_error;
 /// Install the hook. Call once, before the runtime starts - a panic before this
 /// point is not reported.
 pub fn init_panic_hook() {
-    let default_hook = std::panic::take_hook();
-
-    std::panic::set_hook(Box::new(move |info| {
+    std::panic::set_hook(Box::new(|info| {
         let backtrace = Backtrace::force_capture();
         let location = info.location();
 
@@ -60,10 +58,6 @@ pub fn init_panic_hook() {
         let mut stdout = std::io::stdout().lock();
         let _ = writeln!(stdout, "{line}");
         let _ = stdout.flush();
-
-        // Still run the default hook. It writes the human-readable form to
-        // stderr, which is what you want when running the binary locally.
-        default_hook(info);
     }));
 }
 
@@ -76,7 +70,7 @@ fn panic_message(info: &std::panic::PanicHookInfo<'_>) -> String {
     } else if let Some(message) = payload.downcast_ref::<&str>() {
         (*message).to_string()
     } else {
-        "Box<dyn Any>".to_string()
+        "non-string panic payload".to_string()
     }
 }
 
@@ -142,12 +136,41 @@ mod tests {
             .unwrap()
             .ends_with("panic.rs"));
 
-        // The default hook still runs, so a developer watching the terminal sees
-        // the familiar message too.
+        // GCP mode emits only the structured entry, without a duplicate on stderr.
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains("the chain view is inconsistent"),
-            "{stderr}"
-        );
+        assert!(stderr.is_empty(), "{stderr}");
+        assert!(!output.status.success());
+    }
+
+    #[test]
+    fn panic_hook_describes_non_string_payloads() {
+        if std::env::var(CHILD).is_ok() {
+            super::init_panic_hook();
+            std::panic::panic_any(42_u64);
+        }
+
+        let output = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "cloud_logging::panic::tests::panic_hook_describes_non_string_payloads",
+                "--exact",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .expect("could not re-run the test binary");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let entry: Value = stdout
+            .lines()
+            .filter(|line| line.starts_with('{'))
+            .find_map(|line| serde_json::from_str(line).ok())
+            .unwrap_or_else(|| panic!("no JSON entry on the child's stdout:\n{stdout}"));
+
+        assert!(entry["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("panic: non-string panic payload\n"));
+        assert!(output.stderr.is_empty());
+        assert!(!output.status.success());
     }
 }
