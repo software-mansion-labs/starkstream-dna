@@ -3741,7 +3741,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c46b5adfb7a3ae4996d327a5bdc90e78fec025806dd312bdbe6f07a755e0ec9"
 dependencies = [
  "itertools 0.15.0",
- "opentelemetry 0.32.0",
+ "opentelemetry 0.31.0",
  "parking_lot",
 ]
 
