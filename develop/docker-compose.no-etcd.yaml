@@ -2,7 +2,7 @@
 # Used to test running without etcd
 services:
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     ports:
     - "9000:9000"
     - "9001:9001"
