@@ -48,7 +48,7 @@ futures-util = "0.3.32"
 hex = { version = "0.4.3", features = ["serde"] }
 memmap2 = "0.9.10"
 mimalloc = "0.1.48"
-mixtrics = { version = "0.2.3", features = ["opentelemetry"] }
+mixtrics = { version = "0.2.5", features = ["opentelemetry_0_31"] }
 opentelemetry = { version = "0.31", features = ["trace", "metrics"] }
 opentelemetry_sdk = { version = "0.31", features = [
     "trace",

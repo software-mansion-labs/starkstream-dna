@@ -47,7 +47,7 @@ pub fn meter(name: &'static str) -> Meter {
 
 pub fn mixtrics_registry(name: &'static str) -> BoxedRegistry {
     let m = meter(name);
-    let registry = mixtrics::registry::opentelemetry::OpenTelemetryMetricsRegistry::new(m);
+    let registry = mixtrics::registry::opentelemetry_0_31::OpenTelemetryMetricsRegistry::new(m);
     Box::new(registry)
 }
 
