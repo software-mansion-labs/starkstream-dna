@@ -5918,6 +5918,7 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry_sdk 0.31.0",
  "pin-project",
+ "serde_json",
  "time",
  "tracing",
  "tracing-opentelemetry 0.32.1",
