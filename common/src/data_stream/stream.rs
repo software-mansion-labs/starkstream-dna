@@ -77,16 +77,90 @@ fn encoded_body_item_len_from_parts(
     encoded_length_delimited_field_len(fragment_id, payload_len)
 }
 
-fn encoded_body_item_len(
+fn encoded_body_item_len<'a>(
     fragment_id: u32,
-    filter_ids: &[u32],
+    filter_ids: impl Iterator<Item = &'a u32>,
     message_len: usize,
 ) -> Result<usize, DataStreamError> {
     encoded_body_item_len_from_parts(
         fragment_id,
-        prost::encoding::uint32::encoded_len_packed(FILTER_IDS_TAG, filter_ids),
+        encoded_filter_ids_len(filter_ids)?,
         message_len,
     )
+}
+
+fn packed_filter_ids_payload_len<'a>(
+    mut filter_ids: impl Iterator<Item = &'a u32>,
+) -> Result<usize, DataStreamError> {
+    filter_ids.try_fold(0usize, |len, filter_id| {
+        len.checked_add(prost::encoding::encoded_len_varint(*filter_id as u64))
+            .ok_or(DataStreamError)
+            .attach_printable("packed filter IDs size overflow")
+    })
+}
+
+fn encoded_filter_ids_len<'a>(
+    filter_ids: impl Iterator<Item = &'a u32>,
+) -> Result<usize, DataStreamError> {
+    let payload_len = packed_filter_ids_payload_len(filter_ids)?;
+    if payload_len == 0 {
+        Ok(0)
+    } else {
+        encoded_length_delimited_field_len(FILTER_IDS_TAG, payload_len)
+    }
+}
+
+fn encode_filter_ids<'a>(
+    filter_ids: impl Iterator<Item = &'a u32>,
+    payload_len: usize,
+    output: &mut BytesMut,
+) {
+    if payload_len == 0 {
+        return;
+    }
+
+    prost::encoding::encode_key(
+        FILTER_IDS_TAG,
+        prost::encoding::WireType::LengthDelimited,
+        output,
+    );
+    prost::encoding::encode_varint(payload_len as u64, output);
+    for filter_id in filter_ids {
+        prost::encoding::encode_varint(*filter_id as u64, output);
+    }
+}
+
+fn encode_body_item<'a>(
+    fragment_id: u32,
+    filter_ids: impl Iterator<Item = &'a u32> + Clone,
+    message: &[u8],
+    output: &mut BytesMut,
+) -> Result<(), DataStreamError> {
+    // This clones only the iterator cursor; the filter IDs remain borrowed.
+    let filter_ids_payload_len = packed_filter_ids_payload_len(filter_ids.clone())?;
+    let filter_ids_len = if filter_ids_payload_len == 0 {
+        0
+    } else {
+        encoded_length_delimited_field_len(FILTER_IDS_TAG, filter_ids_payload_len)?
+    };
+    let payload_len = filter_ids_len
+        .checked_add(message.len())
+        .ok_or(DataStreamError)
+        .attach_printable("filtered body item payload size overflow")?;
+    let payload_len = u64::try_from(payload_len)
+        .change_context(DataStreamError)
+        .attach_printable("filtered body item payload does not fit in u64")?;
+
+    prost::encoding::encode_key(
+        fragment_id,
+        prost::encoding::WireType::LengthDelimited,
+        output,
+    );
+    prost::encoding::encode_varint(payload_len, output);
+    encode_filter_ids(filter_ids, filter_ids_payload_len, output);
+    output.put_slice(message);
+
+    Ok(())
 }
 
 fn encode_header(fragment_id: u32, data: &[u8], output: &mut BytesMut) {
@@ -97,19 +171,6 @@ fn encode_header(fragment_id: u32, data: &[u8], output: &mut BytesMut) {
     );
     prost::encoding::encode_varint(data.len() as u64, output);
     output.put_slice(data);
-}
-
-fn encode_body_item(fragment_id: u32, filter_ids: &[u32], message: &[u8], output: &mut BytesMut) {
-    let filter_ids_len = prost::encoding::uint32::encoded_len_packed(FILTER_IDS_TAG, filter_ids);
-
-    prost::encoding::encode_key(
-        fragment_id,
-        prost::encoding::WireType::LengthDelimited,
-        output,
-    );
-    prost::encoding::encode_varint((filter_ids_len + message.len()) as u64, output);
-    prost::encoding::uint32::encode_packed(FILTER_IDS_TAG, filter_ids, output);
-    output.put_slice(message);
 }
 
 impl DataStream {
@@ -637,7 +698,7 @@ impl DataStream {
                     ArchivedJoinTo::One(inner) => {
                         for match_ in filter_match.iter() {
                             if let Some(index) = inner.get(&match_.index) {
-                                for filter_id in match_.filter_ids.iter() {
+                                for filter_id in match_.filter_ids() {
                                     target_fragment_matches.add_single_match(*filter_id, index);
                                 }
                             }
@@ -646,7 +707,7 @@ impl DataStream {
                     ArchivedJoinTo::Many(inner) => {
                         for match_ in filter_match.iter() {
                             if let Some(bitmap) = inner.get(&match_.index) {
-                                for filter_id in match_.filter_ids.iter() {
+                                for filter_id in match_.filter_ids() {
                                     target_fragment_matches.add_match(*filter_id, &bitmap);
                                 }
                             }
@@ -700,7 +761,7 @@ impl DataStream {
                     encoded_size = encoded_size
                         .checked_add(encoded_body_item_len(
                             *fragment_id as u32,
-                            &match_.filter_ids,
+                            match_.filter_ids(),
                             message_bytes.len(),
                         )?)
                         .ok_or(DataStreamError)
@@ -723,10 +784,10 @@ impl DataStream {
                     let message_bytes = &body.data[match_.index as usize];
                     encode_body_item(
                         fragment_id as u32,
-                        &match_.filter_ids,
+                        match_.filter_ids(),
                         message_bytes.as_slice(),
                         &mut data_buffer,
-                    );
+                    )?;
                 }
 
                 let fragment_size = data_buffer.len() - starting_size;
@@ -843,12 +904,12 @@ mod tests {
         for (fragment_id, filter_ids, message) in cases {
             let existing = encode_body_item_existing(fragment_id, &filter_ids, &message);
             assert_eq!(
-                encoded_body_item_len(fragment_id, &filter_ids, message.len()).unwrap(),
+                encoded_body_item_len(fragment_id, filter_ids.iter(), message.len()).unwrap(),
                 existing.len()
             );
 
             let mut actual = BytesMut::new();
-            encode_body_item(fragment_id, &filter_ids, &message, &mut actual);
+            encode_body_item(fragment_id, filter_ids.iter(), &message, &mut actual).unwrap();
             assert_eq!(actual.freeze(), existing);
         }
     }
@@ -870,12 +931,12 @@ mod tests {
         expected.extend_from_slice(&encode_body_item_existing(255, &[3], &body_b));
 
         let predicted = encoded_header_len(1, header.len()).unwrap()
-            + encoded_body_item_len(2, &[1, 128], body_a.len()).unwrap()
-            + encoded_body_item_len(255, &[3], body_b.len()).unwrap();
+            + encoded_body_item_len(2, [1, 128].iter(), body_a.len()).unwrap()
+            + encoded_body_item_len(255, [3].iter(), body_b.len()).unwrap();
         let mut actual = BytesMut::with_capacity(predicted);
         encode_header(1, &header, &mut actual);
-        encode_body_item(2, &[1, 128], &body_a, &mut actual);
-        encode_body_item(255, &[3], &body_b, &mut actual);
+        encode_body_item(2, [1, 128].iter(), &body_a, &mut actual).unwrap();
+        encode_body_item(255, [3].iter(), &body_b, &mut actual).unwrap();
 
         assert_eq!(actual.len(), predicted);
         assert_eq!(actual.freeze(), expected.freeze());

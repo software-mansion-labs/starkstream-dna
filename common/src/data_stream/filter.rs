@@ -15,9 +15,15 @@ pub trait BlockFilterFactory {
 pub struct FilterMatch(BTreeMap<u32, HashSet<FilterId>>);
 
 #[derive(Debug)]
-pub struct Match {
+pub struct Match<'a> {
     pub index: u32,
-    pub filter_ids: Vec<FilterId>,
+    filter_ids: &'a HashSet<FilterId>,
+}
+
+impl Match<'_> {
+    pub fn filter_ids(&self) -> impl Iterator<Item = &FilterId> + Clone + '_ {
+        self.filter_ids.iter()
+    }
 }
 
 impl FilterMatch {
@@ -43,10 +49,10 @@ impl FilterMatch {
         self.0.entry(index).or_default().insert(filter_id);
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Match> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Match<'_>> + '_ {
         self.0.iter().map(|(index, filter_ids)| Match {
             index: *index,
-            filter_ids: filter_ids.iter().copied().collect(),
+            filter_ids,
         })
     }
 }
