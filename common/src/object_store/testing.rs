@@ -25,11 +25,11 @@ pub trait MinIOExt {
 
 impl Image for MinIO {
     fn name(&self) -> &str {
-        "quay.io/minio/minio"
+        "pgsty/silo"
     }
 
     fn tag(&self) -> &str {
-        "RELEASE.2025-09-07T16-13-09Z"
+        "RELEASE.2026-09-16T00-00-00Z"
     }
 
     fn ready_conditions(&self) -> Vec<WaitFor> {
