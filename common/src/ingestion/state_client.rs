@@ -2,6 +2,7 @@ use error_stack::{Result, ResultExt};
 use futures::{Stream, StreamExt};
 use starkstream_dna_etcd::{EtcdClient, KvClient, WatchClient};
 use tokio_util::sync::CancellationToken;
+use tracing::warn;
 
 use crate::chain_store::RecentSegmentPointer;
 
@@ -289,7 +290,18 @@ impl IngestionStateClient {
         Ok(Some(block))
     }
 
+    /// Store the last segmented block. Never moves it backwards: blocks up to the grouped
+    /// block are pruned, so a lower value would point compaction at deleted blocks.
     pub async fn put_segmented(&mut self, block: u64) -> Result<(), IngestionStateClientError> {
+        if let Some(current) = self.get_segmented().await? {
+            if current >= block {
+                if current > block {
+                    warn!(current, block, "refusing to move segmented block backwards");
+                }
+                return Ok(());
+            }
+        }
+
         let value = block.to_string();
         self.kv_client
             .put(SEGMENTED_KEY, value.as_bytes())
@@ -324,7 +336,17 @@ impl IngestionStateClient {
         Ok(Some(block))
     }
 
+    /// Store the last grouped block. Never moves it backwards.
     pub async fn put_grouped(&mut self, block: u64) -> Result<(), IngestionStateClientError> {
+        if let Some(current) = self.get_grouped().await? {
+            if current >= block {
+                if current > block {
+                    warn!(current, block, "refusing to move grouped block backwards");
+                }
+                return Ok(());
+            }
+        }
+
         let value = block.to_string();
         self.kv_client
             .put(GROUPED_KEY, value.as_bytes())
