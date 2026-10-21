@@ -54,6 +54,39 @@ impl KvClient {
             .attach_printable_lazy(|| format!("key: {}", key))
     }
 
+    /// Put the value only if the key's mod revision still equals `mod_revision`
+    /// (`0` means the key must not exist). Returns whether the put was applied.
+    #[tracing::instrument(level = "debug", skip_all, fields(key = key.as_ref()))]
+    pub async fn put_if_mod_revision(
+        &mut self,
+        key: impl AsRef<str>,
+        value: impl AsRef<[u8]>,
+        mod_revision: i64,
+    ) -> Result<bool, EtcdClientError> {
+        let formatted_key = self.format_key(key.as_ref());
+
+        // etcd checks the condition and does the put atomically, so no other write can land
+        // between them.
+        let txn = etcd_client::Txn::new()
+            .when(&[etcd_client::Compare::mod_revision(
+                formatted_key.clone(),
+                etcd_client::CompareOp::Equal,
+                mod_revision,
+            )])
+            .and_then(&[etcd_client::TxnOp::put(formatted_key, value.as_ref(), None)]);
+
+        let response = self
+            .client
+            .txn(txn)
+            .await
+            .change_context(EtcdClientError)
+            .attach_printable("failed to conditionally put key to etcd")
+            .attach_printable_lazy(|| format!("key: {}", key.as_ref()))?;
+
+        // `false` means the key changed since `mod_revision` and nothing was written.
+        Ok(response.succeeded())
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(key = key.as_ref()))]
     pub async fn delete(
         &mut self,

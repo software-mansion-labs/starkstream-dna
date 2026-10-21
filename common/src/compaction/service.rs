@@ -129,13 +129,10 @@ impl CompactionService {
                 lock.change_context(CompactionError)
             }
             Some(service) = services.join_next() => {
-                match service {
-                    Ok((name, result)) => {
-                        info!("compaction {name} loop terminated");
-                        result.change_context(CompactionError)
-                    }
-                    Err(err) => Err(err).change_context(CompactionError),
-                }
+                service.change_context(CompactionError).and_then(|(name, result)| {
+                    info!("compaction {name} loop terminated");
+                    result.change_context(CompactionError)
+                })
             }
         };
 
