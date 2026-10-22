@@ -2,6 +2,7 @@ use error_stack::{Result, ResultExt};
 use futures::{Stream, StreamExt};
 use starkstream_dna_etcd::{EtcdClient, KvClient, WatchClient};
 use tokio_util::sync::CancellationToken;
+use tracing::warn;
 
 use crate::chain_store::RecentSegmentPointer;
 
@@ -289,15 +290,10 @@ impl IngestionStateClient {
         Ok(Some(block))
     }
 
+    /// Store the last segmented block. Never moves it backwards: blocks up to the grouped
+    /// block are pruned, so a lower value would point compaction at deleted blocks.
     pub async fn put_segmented(&mut self, block: u64) -> Result<(), IngestionStateClientError> {
-        let value = block.to_string();
-        self.kv_client
-            .put(SEGMENTED_KEY, value.as_bytes())
-            .await
-            .change_context(IngestionStateClientError)
-            .attach_printable("failed to put segmented block")?;
-
-        Ok(())
+        self.put_if_higher(SEGMENTED_KEY, block).await
     }
 
     pub async fn get_grouped(&mut self) -> Result<Option<u64>, IngestionStateClientError> {
@@ -324,15 +320,9 @@ impl IngestionStateClient {
         Ok(Some(block))
     }
 
+    /// Store the last grouped block. Never moves it backwards.
     pub async fn put_grouped(&mut self, block: u64) -> Result<(), IngestionStateClientError> {
-        let value = block.to_string();
-        self.kv_client
-            .put(GROUPED_KEY, value.as_bytes())
-            .await
-            .change_context(IngestionStateClientError)
-            .attach_printable("failed to put grouped block")?;
-
-        Ok(())
+        self.put_if_higher(GROUPED_KEY, block).await
     }
 
     pub async fn get_pruned(&mut self) -> Result<Option<u64>, IngestionStateClientError> {
@@ -368,6 +358,65 @@ impl IngestionStateClient {
             .attach_printable("failed to put pruned block")?;
 
         Ok(())
+    }
+
+    /// Store `block` under `key` unless the stored value is already at or past it.
+    ///
+    /// The write is a compare-and-swap on the key's mod revision, so a concurrent writer
+    /// that stored a higher value between our read and write is never overwritten.
+    async fn put_if_higher(
+        &mut self,
+        key: &str,
+        block: u64,
+    ) -> Result<(), IngestionStateClientError> {
+        loop {
+            // Read the current value together with its mod revision.
+            let response = self
+                .kv_client
+                .get(key)
+                .await
+                .change_context(IngestionStateClientError)
+                .attach_printable("failed to get block")
+                .attach_printable_lazy(|| format!("key: {key}"))?;
+
+            // A missing key has mod revision 0.
+            let mod_revision = match response.kvs().first() {
+                None => 0,
+                Some(kv) => {
+                    let current = String::from_utf8(kv.value().to_vec())
+                        .change_context(IngestionStateClientError)
+                        .attach_printable("failed to decode block")?
+                        .parse::<u64>()
+                        .change_context(IngestionStateClientError)
+                        .attach_printable("failed to parse block")?;
+
+                    // Already at or past `block`: writing would not move it forward.
+                    if current >= block {
+                        if current > block {
+                            warn!(key, current, block, "refusing to move block backwards");
+                        }
+                        return Ok(());
+                    }
+
+                    // The revision the conditional put below checks against.
+                    kv.mod_revision()
+                }
+            };
+
+            // Write only if nobody changed the key since we read it.
+            let applied = self
+                .kv_client
+                .put_if_mod_revision(key, block.to_string(), mod_revision)
+                .await
+                .change_context(IngestionStateClientError)
+                .attach_printable("failed to put block")
+                .attach_printable_lazy(|| format!("key: {key}"))?;
+
+            if applied {
+                return Ok(());
+            }
+            // Another writer changed the key since we read it. Re-read and compare again.
+        }
     }
 }
 

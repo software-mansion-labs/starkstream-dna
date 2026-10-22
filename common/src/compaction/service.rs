@@ -1,5 +1,7 @@
 use error_stack::{Result, ResultExt};
+use futures::FutureExt;
 use starkstream_dna_etcd::{EtcdClient, Lock};
+use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
@@ -99,13 +101,26 @@ impl CompactionService {
             self.metrics.clone(),
         );
 
-        let segment_service_handle = tokio::spawn(segment_service.start(ct.clone()));
-        let group_service_handle = tokio::spawn(group_service.start(ct.clone()));
-        let prune_service_handle = tokio::spawn(prune_service.start(ct.clone()));
+        let mut services = JoinSet::new();
+        services.spawn(
+            segment_service
+                .start(ct.clone())
+                .map(|result| ("segmentation", result)),
+        );
+        services.spawn(
+            group_service
+                .start(ct.clone())
+                .map(|result| ("group service", result)),
+        );
+        services.spawn(
+            prune_service
+                .start(ct.clone())
+                .map(|result| ("prune service", result)),
+        );
 
         let lock_handle = lock_keep_alive_loop(lock, ct.clone());
 
-        tokio::select! {
+        let result = tokio::select! {
             _ = ct.cancelled() => {
                 Ok(())
             }
@@ -113,19 +128,19 @@ impl CompactionService {
                 info!("compaction lock loop terminated");
                 lock.change_context(CompactionError)
             }
-            segment_service = segment_service_handle => {
-                info!("compaction segmentation loop terminated");
-                segment_service.change_context(CompactionError)?.change_context(CompactionError)
+            Some(service) = services.join_next() => {
+                service.change_context(CompactionError).and_then(|(name, result)| {
+                    info!("compaction {name} loop terminated");
+                    result.change_context(CompactionError)
+                })
             }
-            group_service = group_service_handle => {
-                info!("compaction group service loop terminated");
-                group_service.change_context(CompactionError)?.change_context(CompactionError)
-            }
-            prune_service = prune_service_handle => {
-                info!("compaction prune service loop terminated");
-                prune_service.change_context(CompactionError)?.change_context(CompactionError)
-            }
-        }
+        };
+
+        // The caller restarts compaction after an error. Wait for the remaining services to
+        // stop so they don't keep running alongside the new ones.
+        services.shutdown().await;
+
+        result
     }
 }
 
