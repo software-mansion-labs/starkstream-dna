@@ -24,7 +24,7 @@ jobs:
           if [ -z "$USER" ]; then
             echo "USER=runner" >> "$GITHUB_ENV"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
       - uses: cachix/install-nix-action@v30
         with:
           nix_path: nixpkgs=channel:nixos-24.11
@@ -39,7 +39,7 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
           df -h /
       - run: nix build .#${{ inputs.target }} -L --accept-flake-config
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4.6.2
         if: ${{ inputs.artifact_name != '' }}
         with:
           name: ${{ inputs.artifact_name }}
